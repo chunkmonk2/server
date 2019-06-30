@@ -12,32 +12,32 @@ then
     echo "Pushing Bitwarden ($TAG)"
     echo "========================"
     
-    docker push bitwarden/api:$TAG
-    docker push bitwarden/identity:$TAG
-    docker push bitwarden/server:$TAG
-    docker push bitwarden/attachments:$TAG
-    docker push bitwarden/icons:$TAG
-    docker push bitwarden/notifications:$TAG
-    docker push bitwarden/admin:$TAG
-    docker push bitwarden/nginx:$TAG
-    docker push bitwarden/mssql:$TAG
-    docker push bitwarden/setup:$TAG
+    docker push chunkmonk2/api:$TAG
+    docker push chunkmonk2/identity:$TAG
+    docker push chunkmonk2/server:$TAG
+    docker push chunkmonk2/attachments:$TAG
+    docker push chunkmonk2/icons:$TAG
+    docker push chunkmonk2/notifications:$TAG
+    docker push chunkmonk2/admin:$TAG
+    docker push chunkmonk2/nginx:$TAG
+    docker push chunkmonk2/mssql:$TAG
+    docker push chunkmonk2/setup:$TAG
 elif [ $# -gt 1 -a "$1" == "tag" ]
 then
     TAG=$2
     
     echo "Tagging Bitwarden as '$TAG'"
     
-    docker tag bitwarden/api bitwarden/api:$TAG
-    docker tag bitwarden/identity bitwarden/identity:$TAG
-    docker tag bitwarden/server bitwarden/server:$TAG
-    docker tag bitwarden/attachments bitwarden/attachments:$TAG
-    docker tag bitwarden/icons bitwarden/icons:$TAG
-    docker tag bitwarden/notifications bitwarden/notifications:$TAG
-    docker tag bitwarden/admin bitwarden/admin:$TAG
-    docker tag bitwarden/nginx bitwarden/nginx:$TAG
-    docker tag bitwarden/mssql bitwarden/mssql:$TAG
-    docker tag bitwarden/setup bitwarden/setup:$TAG
+    docker tag bitwarden/api chunkmonk2/api:$TAG
+    docker tag bitwarden/identity chunkmonk2/identity:$TAG
+    docker tag bitwarden/server chunkmonk2/server:$TAG
+    docker tag bitwarden/attachments chunkmonk2/attachments:$TAG
+    docker tag bitwarden/icons chunkmonk2/icons:$TAG
+    docker tag bitwarden/notifications chunkmonk2/notifications:$TAG
+    docker tag bitwarden/admin chunkmonk2/admin:$TAG
+    docker tag bitwarden/nginx chunkmonk2/nginx:$TAG
+    docker tag bitwarden/mssql chunkmonk2/mssql:$TAG
+    docker tag bitwarden/setup chunkmonk2/setup:$TAG
 else
     echo "Building Bitwarden"
     echo "=================="

@@ -36,7 +36,7 @@ then
 fi
 
 SCRIPTS_DIR="$OUTPUT/scripts"
-GITHUB_BASE_URL="https://raw.githubusercontent.com/bitwarden/server/master"
+GITHUB_BASE_URL="https://raw.githubusercontent.com/chunkmonk2/server/master"
 COREVERSION="1.30.4"
 WEBVERSION="2.10.1"
 

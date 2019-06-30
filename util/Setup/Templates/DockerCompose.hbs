@@ -17,7 +17,7 @@ version: '{{{ComposeVersion}}}'
 
 services:
   mssql:
-    image: bitwarden/mssql:{{{CoreVersion}}}
+    image: chunkmonk2/mssql:{{{CoreVersion}}}
     container_name: bitwarden-mssql
     restart: always
     volumes:
@@ -44,7 +44,7 @@ services:
       - ../env/uid.env
 
   attachments:
-    image: bitwarden/attachments:{{{CoreVersion}}}
+    image: chunkmonk2/attachments:{{{CoreVersion}}}
     container_name: bitwarden-attachments
     restart: always
     volumes:
@@ -54,7 +54,7 @@ services:
       - ../env/uid.env
 
   api:
-    image: bitwarden/api:{{{CoreVersion}}}
+    image: chunkmonk2/api:{{{CoreVersion}}}
     container_name: bitwarden-api
     restart: always
     volumes:
@@ -67,7 +67,7 @@ services:
       - ../env/global.override.env
 
   identity:
-    image: bitwarden/identity:{{{CoreVersion}}}
+    image: chunkmonk2/identity:{{{CoreVersion}}}
     container_name: bitwarden-identity
     restart: always
     volumes:
@@ -81,7 +81,7 @@ services:
       - ../env/global.override.env
 
   admin:
-    image: bitwarden/admin:{{{CoreVersion}}}
+    image: chunkmonk2/admin:{{{CoreVersion}}}
     container_name: bitwarden-admin
     restart: always
     depends_on:
@@ -96,7 +96,7 @@ services:
       - ../env/global.override.env
 
   icons:
-    image: bitwarden/icons:{{{CoreVersion}}}
+    image: chunkmonk2/icons:{{{CoreVersion}}}
     container_name: bitwarden-icons
     restart: always
     volumes:
@@ -107,7 +107,7 @@ services:
       - ../env/uid.env
 
   notifications:
-    image: bitwarden/notifications:{{{CoreVersion}}}
+    image: chunkmonk2/notifications:{{{CoreVersion}}}
     container_name: bitwarden-notifications
     restart: always
     volumes:
@@ -119,7 +119,7 @@ services:
       - ../env/global.override.env
 
   nginx:
-    image: bitwarden/nginx:{{{CoreVersion}}}
+    image: chunkmonk2/nginx:{{{CoreVersion}}}
     container_name: bitwarden-nginx
     restart: always
     depends_on:
