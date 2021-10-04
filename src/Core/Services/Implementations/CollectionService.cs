@@ -5,6 +5,8 @@ using Bit.Core.Models.Table;
 using Bit.Core.Repositories;
 using System.Collections.Generic;
 using Bit.Core.Models.Data;
+using Bit.Core.Models.Business;
+using Bit.Core.Enums;
 
 namespace Bit.Core.Services
 {
@@ -16,6 +18,7 @@ namespace Bit.Core.Services
         private readonly ICollectionRepository _collectionRepository;
         private readonly IUserRepository _userRepository;
         private readonly IMailService _mailService;
+        private readonly IReferenceEventService _referenceEventService;
 
         public CollectionService(
             IEventService eventService,
@@ -23,7 +26,8 @@ namespace Bit.Core.Services
             IOrganizationUserRepository organizationUserRepository,
             ICollectionRepository collectionRepository,
             IUserRepository userRepository,
-            IMailService mailService)
+            IMailService mailService,
+            IReferenceEventService referenceEventService)
         {
             _eventService = eventService;
             _organizationRepository = organizationRepository;
@@ -31,30 +35,31 @@ namespace Bit.Core.Services
             _collectionRepository = collectionRepository;
             _userRepository = userRepository;
             _mailService = mailService;
+            _referenceEventService = referenceEventService;
         }
 
         public async Task SaveAsync(Collection collection, IEnumerable<SelectionReadOnly> groups = null,
             Guid? assignUserId = null)
         {
             var org = await _organizationRepository.GetByIdAsync(collection.OrganizationId);
-            if(org == null)
+            if (org == null)
             {
                 throw new BadRequestException("Organization not found");
             }
 
-            if(collection.Id == default(Guid))
+            if (collection.Id == default(Guid))
             {
-                if(org.MaxCollections.HasValue)
+                if (org.MaxCollections.HasValue)
                 {
                     var collectionCount = await _collectionRepository.GetCountByOrganizationIdAsync(org.Id);
-                    if(org.MaxCollections.Value <= collectionCount)
+                    if (org.MaxCollections.Value <= collectionCount)
                     {
                         throw new BadRequestException("You have reached the maximum number of collections " +
                         $"({org.MaxCollections.Value}) for this organization.");
                     }
                 }
 
-                if(groups == null || !org.UseGroups)
+                if (groups == null || !org.UseGroups)
                 {
                     await _collectionRepository.CreateAsync(collection);
                 }
@@ -64,10 +69,10 @@ namespace Bit.Core.Services
                 }
 
                 // Assign a user to the newly created collection.
-                if(assignUserId.HasValue)
+                if (assignUserId.HasValue)
                 {
                     var orgUser = await _organizationUserRepository.GetByOrganizationAsync(org.Id, assignUserId.Value);
-                    if(orgUser != null && orgUser.Status == Enums.OrganizationUserStatusType.Confirmed)
+                    if (orgUser != null && orgUser.Status == Enums.OrganizationUserStatusType.Confirmed)
                     {
                         await _collectionRepository.UpdateUsersAsync(collection.Id,
                             new List<SelectionReadOnly> {
@@ -76,10 +81,11 @@ namespace Bit.Core.Services
                 }
 
                 await _eventService.LogCollectionEventAsync(collection, Enums.EventType.Collection_Created);
+                await _referenceEventService.RaiseEventAsync(new ReferenceEvent(ReferenceEventType.CollectionCreated, org));
             }
             else
             {
-                if(!org.UseGroups)
+                if (!org.UseGroups)
                 {
                     await _collectionRepository.ReplaceAsync(collection);
                 }
@@ -101,7 +107,7 @@ namespace Bit.Core.Services
         public async Task DeleteUserAsync(Collection collection, Guid organizationUserId)
         {
             var orgUser = await _organizationUserRepository.GetByIdAsync(organizationUserId);
-            if(orgUser == null || orgUser.OrganizationId != collection.OrganizationId)
+            if (orgUser == null || orgUser.OrganizationId != collection.OrganizationId)
             {
                 throw new NotFoundException();
             }

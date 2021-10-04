@@ -13,7 +13,7 @@ namespace Bit.Notifications
             IHubContext<NotificationsHub> hubContext, CancellationToken cancellationToken = default(CancellationToken))
         {
             var notification = JsonConvert.DeserializeObject<PushNotificationData<object>>(notificationJson);
-            switch(notification.Type)
+            switch (notification.Type)
             {
                 case PushType.SyncCipherUpdate:
                 case PushType.SyncCipherCreate:
@@ -22,12 +22,12 @@ namespace Bit.Notifications
                     var cipherNotification =
                         JsonConvert.DeserializeObject<PushNotificationData<SyncCipherPushNotification>>(
                             notificationJson);
-                    if(cipherNotification.Payload.UserId.HasValue)
+                    if (cipherNotification.Payload.UserId.HasValue)
                     {
                         await hubContext.Clients.User(cipherNotification.Payload.UserId.ToString())
                             .SendAsync("ReceiveMessage", cipherNotification, cancellationToken);
                     }
-                    else if(cipherNotification.Payload.OrganizationId.HasValue)
+                    else if (cipherNotification.Payload.OrganizationId.HasValue)
                     {
                         await hubContext.Clients.Group(
                             $"Organization_{cipherNotification.Payload.OrganizationId}")
@@ -53,6 +53,15 @@ namespace Bit.Notifications
                             notificationJson);
                     await hubContext.Clients.User(userNotification.Payload.UserId.ToString())
                             .SendAsync("ReceiveMessage", userNotification, cancellationToken);
+                    break;
+                case PushType.SyncSendCreate:
+                case PushType.SyncSendUpdate:
+                case PushType.SyncSendDelete:
+                    var sendNotification =
+                        JsonConvert.DeserializeObject<PushNotificationData<SyncSendPushNotification>>(
+                                notificationJson);
+                    await hubContext.Clients.User(sendNotification.Payload.UserId.ToString())
+                        .SendAsync("ReceiveMessage", sendNotification, cancellationToken);
                     break;
                 default:
                     break;

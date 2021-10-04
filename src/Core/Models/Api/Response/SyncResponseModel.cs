@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Bit.Core.Models.Data;
 using Bit.Core.Models.Table;
+using Bit.Core.Settings;
 using Core.Models.Data;
 
 namespace Bit.Core.Models.Api
@@ -14,19 +15,26 @@ namespace Bit.Core.Models.Api
             User user,
             bool userTwoFactorEnabled,
             IEnumerable<OrganizationUserOrganizationDetails> organizationUserDetails,
+            IEnumerable<ProviderUserProviderDetails> providerUserDetails,
+            IEnumerable<ProviderUserOrganizationDetails> providerUserOrganizationDetails,
             IEnumerable<Folder> folders,
             IEnumerable<CollectionDetails> collections,
             IEnumerable<CipherDetails> ciphers,
             IDictionary<Guid, IGrouping<Guid, CollectionCipher>> collectionCiphersDict,
-            bool excludeDomains)
+            bool excludeDomains,
+            IEnumerable<Policy> policies,
+            IEnumerable<Send> sends)
             : base("sync")
         {
-            Profile = new ProfileResponseModel(user, organizationUserDetails, userTwoFactorEnabled);
+            Profile = new ProfileResponseModel(user, organizationUserDetails, providerUserDetails,
+                providerUserOrganizationDetails, userTwoFactorEnabled);
             Folders = folders.Select(f => new FolderResponseModel(f));
             Ciphers = ciphers.Select(c => new CipherDetailsResponseModel(c, globalSettings, collectionCiphersDict));
             Collections = collections?.Select(
                 c => new CollectionDetailsResponseModel(c)) ?? new List<CollectionDetailsResponseModel>();
             Domains = excludeDomains ? null : new DomainsResponseModel(user, false);
+            Policies = policies?.Select(p => new PolicyResponseModel(p)) ?? new List<PolicyResponseModel>();
+            Sends = sends.Select(s => new SendResponseModel(s, globalSettings));
         }
 
         public ProfileResponseModel Profile { get; set; }
@@ -34,5 +42,7 @@ namespace Bit.Core.Models.Api
         public IEnumerable<CollectionDetailsResponseModel> Collections { get; set; }
         public IEnumerable<CipherDetailsResponseModel> Ciphers { get; set; }
         public DomainsResponseModel Domains { get; set; }
+        public IEnumerable<PolicyResponseModel> Policies { get; set; }
+        public IEnumerable<SendResponseModel> Sends { get; set; }
     }
 }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Bit.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using Bit.Core.Repositories;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Services
 {
@@ -24,16 +25,16 @@ namespace Bit.Core.Services
             ILogger<RelayPushNotificationService> relayLogger,
             ILogger<NotificationsApiPushNotificationService> hubLogger)
         {
-            if(globalSettings.SelfHosted)
+            if (globalSettings.SelfHosted)
             {
-                if(CoreHelpers.SettingHasValue(globalSettings.PushRelayBaseUri) &&
+                if (CoreHelpers.SettingHasValue(globalSettings.PushRelayBaseUri) &&
                     globalSettings.Installation?.Id != null &&
                     CoreHelpers.SettingHasValue(globalSettings.Installation?.Key))
                 {
                     _services.Add(new RelayPushNotificationService(deviceRepository, globalSettings,
                         httpContextAccessor, relayLogger));
                 }
-                if(CoreHelpers.SettingHasValue(globalSettings.InternalIdentityKey) &&
+                if (CoreHelpers.SettingHasValue(globalSettings.InternalIdentityKey) &&
                     CoreHelpers.SettingHasValue(globalSettings.BaseServiceUri.InternalNotifications))
                 {
                     _services.Add(new NotificationsApiPushNotificationService(
@@ -42,12 +43,12 @@ namespace Bit.Core.Services
             }
             else
             {
-                if(CoreHelpers.SettingHasValue(globalSettings.NotificationHub.ConnectionString))
+                if (CoreHelpers.SettingHasValue(globalSettings.NotificationHub.ConnectionString))
                 {
                     _services.Add(new NotificationHubPushNotificationService(installationDeviceRepository,
                         globalSettings, httpContextAccessor));
                 }
-                if(CoreHelpers.SettingHasValue(globalSettings.Notifications?.ConnectionString))
+                if (CoreHelpers.SettingHasValue(globalSettings.Notifications?.ConnectionString))
                 {
                     _services.Add(new AzureQueuePushNotificationService(globalSettings, httpContextAccessor));
                 }
@@ -122,6 +123,24 @@ namespace Bit.Core.Services
             return Task.FromResult(0);
         }
 
+        public Task PushSyncSendCreateAsync(Send send)
+        {
+            PushToServices((s) => s.PushSyncSendCreateAsync(send));
+            return Task.FromResult(0);
+        }
+
+        public Task PushSyncSendUpdateAsync(Send send)
+        {
+            PushToServices((s) => s.PushSyncSendUpdateAsync(send));
+            return Task.FromResult(0);
+        }
+
+        public Task PushSyncSendDeleteAsync(Send send)
+        {
+            PushToServices((s) => s.PushSyncSendDeleteAsync(send));
+            return Task.FromResult(0);
+        }
+
         public Task SendPayloadToUserAsync(string userId, PushType type, object payload, string identifier,
             string deviceId = null)
         {
@@ -138,9 +157,9 @@ namespace Bit.Core.Services
 
         private void PushToServices(Func<IPushNotificationService, Task> pushFunc)
         {
-            if(_services != null)
+            if (_services != null)
             {
-                foreach(var service in _services)
+                foreach (var service in _services)
                 {
                     pushFunc(service);
                 }

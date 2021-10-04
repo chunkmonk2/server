@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using Bit.Core.Models.Api;
 using Bit.Core.Enums;
+using Bit.Core.Settings;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
@@ -47,7 +48,7 @@ namespace Bit.Core.Services
 
         public async Task AddUserRegistrationOrganizationAsync(IEnumerable<string> deviceIds, string organizationId)
         {
-            if(!deviceIds.Any())
+            if (!deviceIds.Any())
             {
                 return;
             }
@@ -58,7 +59,7 @@ namespace Bit.Core.Services
 
         public async Task DeleteUserRegistrationOrganizationAsync(IEnumerable<string> deviceIds, string organizationId)
         {
-            if(!deviceIds.Any())
+            if (!deviceIds.Any())
             {
                 return;
             }

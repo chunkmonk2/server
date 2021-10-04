@@ -9,7 +9,8 @@
         User_Recovered2fa = 1004,
         User_FailedLogIn = 1005,
         User_FailedLogIn2fa = 1006,
-        User_ExportedVault = 1007,
+        User_ClientExportedVault = 1007,
+        User_UpdatedTempPassword = 1008,
 
         Cipher_Created = 1100,
         Cipher_Updated = 1101,
@@ -21,9 +22,14 @@
         Cipher_ClientViewed = 1107,
         Cipher_ClientToggledPasswordVisible = 1108,
         Cipher_ClientToggledHiddenFieldVisible = 1109,
-        Cipher_ClientCopiedPassword = 1110,
-        Cipher_ClientCopedHiddenField = 1111,
-        Cipher_ClientAutofilled = 1112,
+        Cipher_ClientToggledCardCodeVisible = 1110,
+        Cipher_ClientCopiedPassword = 1111,
+        Cipher_ClientCopiedHiddenField = 1112,
+        Cipher_ClientCopiedCardCode = 1113,
+        Cipher_ClientAutofilled = 1114,
+        Cipher_SoftDeleted = 1115,
+        Cipher_Restored = 1116,
+        Cipher_ClientToggledCardNumberVisible = 1117,
 
         Collection_Created = 1300,
         Collection_Updated = 1301,
@@ -38,8 +44,27 @@
         OrganizationUser_Updated = 1502,
         OrganizationUser_Removed = 1503,
         OrganizationUser_UpdatedGroups = 1504,
+        OrganizationUser_UnlinkedSso = 1505,
+        OrganizationUser_ResetPassword_Enroll = 1506,
+        OrganizationUser_ResetPassword_Withdraw = 1507,
+        OrganizationUser_AdminResetPassword = 1508,
+        OrganizationUser_ResetSsoLink = 1509,
 
         Organization_Updated = 1600,
         Organization_PurgedVault = 1601,
+        // Organization_ClientExportedVault = 1602,
+        Organization_VaultAccessed = 1603,
+
+        Policy_Updated = 1700,
+        
+        ProviderUser_Invited = 1800,
+        ProviderUser_Confirmed = 1801,
+        ProviderUser_Updated = 1802,
+        ProviderUser_Removed = 1803,
+
+        ProviderOrganization_Created = 1900,
+        ProviderOrganization_Added = 1901,
+        ProviderOrganization_Removed = 1902,
+        ProviderOrganization_VaultAccessed = 1903,
     }
 }

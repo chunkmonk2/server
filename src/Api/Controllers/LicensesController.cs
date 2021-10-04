@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Bit.Core.Services;
 using Microsoft.AspNetCore.Authorization;
-using Bit.Core;
+using Bit.Core.Context;
 using System.Threading.Tasks;
 using Bit.Core.Models.Business;
 using Bit.Core.Exceptions;
@@ -21,7 +21,7 @@ namespace Bit.Api.Controllers
         private readonly IUserService _userService;
         private readonly IOrganizationRepository _organizationRepository;
         private readonly IOrganizationService _organizationService;
-        private readonly CurrentContext _currentContext;
+        private readonly ICurrentContext _currentContext;
 
         public LicensesController(
             ILicensingService licensingService,
@@ -29,7 +29,7 @@ namespace Bit.Api.Controllers
             IUserService userService,
             IOrganizationRepository organizationRepository,
             IOrganizationService organizationService,
-            CurrentContext currentContext)
+            ICurrentContext currentContext)
         {
             _licensingService = licensingService;
             _userRepository = userRepository;
@@ -43,11 +43,11 @@ namespace Bit.Api.Controllers
         public async Task<UserLicense> GetUser(string id, [FromQuery]string key)
         {
             var user = await _userRepository.GetByIdAsync(new Guid(id));
-            if(user == null)
+            if (user == null)
             {
                 return null;
             }
-            else if(!user.LicenseKey.Equals(key))
+            else if (!user.LicenseKey.Equals(key))
             {
                 await Task.Delay(2000);
                 throw new BadRequestException("Invalid license key.");
@@ -61,11 +61,11 @@ namespace Bit.Api.Controllers
         public async Task<OrganizationLicense> GetOrganization(string id, [FromQuery]string key)
         {
             var org = await _organizationRepository.GetByIdAsync(new Guid(id));
-            if(org == null)
+            if (org == null)
             {
                 return null;
             }
-            else if(!org.LicenseKey.Equals(key))
+            else if (!org.LicenseKey.Equals(key))
             {
                 await Task.Delay(2000);
                 throw new BadRequestException("Invalid license key.");

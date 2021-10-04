@@ -1,6 +1,7 @@
 ﻿using Bit.Core.Enums;
 using Bit.Core.Models.Table;
 using Bit.Core.Services;
+using Bit.Core.Settings;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -17,9 +18,9 @@ namespace Bit.Core.Models.Business
         { }
 
         public OrganizationLicense(Organization org, SubscriptionInfo subscriptionInfo, Guid installationId,
-            ILicensingService licenseService)
+            ILicensingService licenseService, int? version = null)
         {
-            Version = 4; // TODO: Version 5 bump
+            Version = version.GetValueOrDefault(7); // TODO: bump to version 8
             LicenseKey = org.LicenseKey;
             InstallationId = installationId;
             Id = org.Id;
@@ -31,20 +32,23 @@ namespace Bit.Core.Models.Business
             PlanType = org.PlanType;
             Seats = org.Seats;
             MaxCollections = org.MaxCollections;
+            UsePolicies = org.UsePolicies;
+            UseSso = org.UseSso;
             UseGroups = org.UseGroups;
             UseEvents = org.UseEvents;
             UseDirectory = org.UseDirectory;
             UseTotp = org.UseTotp;
             Use2fa = org.Use2fa;
             UseApi = org.UseApi;
+            UseResetPassword = org.UseResetPassword;
             MaxStorageGb = org.MaxStorageGb;
             SelfHost = org.SelfHost;
             UsersGetPremium = org.UsersGetPremium;
             Issued = DateTime.UtcNow;
 
-            if(subscriptionInfo?.Subscription == null)
+            if (subscriptionInfo?.Subscription == null)
             {
-                if(org.PlanType == PlanType.Custom && org.ExpirationDate.HasValue)
+                if (org.PlanType == PlanType.Custom && org.ExpirationDate.HasValue)
                 {
                     Expires = Refresh = org.ExpirationDate.Value;
                     Trial = false;
@@ -55,7 +59,7 @@ namespace Bit.Core.Models.Business
                     Trial = true;
                 }
             }
-            else if(subscriptionInfo.Subscription.TrialEndDate.HasValue &&
+            else if (subscriptionInfo.Subscription.TrialEndDate.HasValue &&
                 subscriptionInfo.Subscription.TrialEndDate.Value > DateTime.UtcNow)
             {
                 Expires = Refresh = subscriptionInfo.Subscription.TrialEndDate.Value;
@@ -63,12 +67,12 @@ namespace Bit.Core.Models.Business
             }
             else
             {
-                if(org.ExpirationDate.HasValue && org.ExpirationDate.Value < DateTime.UtcNow)
+                if (org.ExpirationDate.HasValue && org.ExpirationDate.Value < DateTime.UtcNow)
                 {
                     // expired
                     Expires = Refresh = org.ExpirationDate.Value;
                 }
-                else if(subscriptionInfo?.Subscription?.PeriodDuration != null &&
+                else if (subscriptionInfo?.Subscription?.PeriodDuration != null &&
                     subscriptionInfo.Subscription.PeriodDuration > TimeSpan.FromDays(180))
                 {
                     Refresh = DateTime.UtcNow.AddDays(30);
@@ -96,14 +100,17 @@ namespace Bit.Core.Models.Business
         public bool Enabled { get; set; }
         public string Plan { get; set; }
         public PlanType PlanType { get; set; }
-        public short? Seats { get; set; }
+        public int? Seats { get; set; }
         public short? MaxCollections { get; set; }
+        public bool UsePolicies { get; set; }
+        public bool UseSso { get; set; }
         public bool UseGroups { get; set; }
         public bool UseEvents { get; set; }
         public bool UseDirectory { get; set; }
         public bool UseTotp { get; set; }
         public bool Use2fa { get; set; }
         public bool UseApi { get; set; }
+        public bool UseResetPassword { get; set; }
         public short? MaxStorageGb { get; set; }
         public bool SelfHost { get; set; }
         public bool UsersGetPremium { get; set; }
@@ -120,7 +127,7 @@ namespace Bit.Core.Models.Business
         public byte[] GetDataBytes(bool forHash = false)
         {
             string data = null;
-            if(Version >= 1 && Version <= 5)
+            if (Version >= 1 && Version <= 8)
             {
                 var props = typeof(OrganizationLicense)
                     .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -135,6 +142,12 @@ namespace Bit.Core.Models.Business
                         (Version >= 4 || !p.Name.Equals(nameof(Use2fa))) &&
                         // UseApi was added in Version 5
                         (Version >= 5 || !p.Name.Equals(nameof(UseApi))) &&
+                        // UsePolicies was added in Version 6
+                        (Version >= 6 || !p.Name.Equals(nameof(UsePolicies))) &&
+                        // UseSso was added in Version 7
+                        (Version >= 7 || !p.Name.Equals(nameof(UseSso))) &&
+                        // UseResetPassword was added in Version 8
+                        (Version >= 8 || !p.Name.Equals(nameof(UseResetPassword))) &&
                         (
                             !forHash ||
                             (
@@ -158,7 +171,7 @@ namespace Bit.Core.Models.Business
 
         public byte[] ComputeHash()
         {
-            using(var alg = SHA256.Create())
+            using (var alg = SHA256.Create())
             {
                 return alg.ComputeHash(GetDataBytes(true));
             }
@@ -166,12 +179,12 @@ namespace Bit.Core.Models.Business
 
         public bool CanUse(GlobalSettings globalSettings)
         {
-            if(!Enabled || Issued > DateTime.UtcNow || Expires < DateTime.UtcNow)
+            if (!Enabled || Issued > DateTime.UtcNow || Expires < DateTime.UtcNow)
             {
                 return false;
             }
 
-            if(Version >= 1 && Version <= 5)
+            if (Version >= 1 && Version <= 8)
             {
                 return InstallationId == globalSettings.Installation.Id && SelfHost;
             }
@@ -183,12 +196,12 @@ namespace Bit.Core.Models.Business
 
         public bool VerifyData(Organization organization, GlobalSettings globalSettings)
         {
-            if(Issued > DateTime.UtcNow || Expires < DateTime.UtcNow)
+            if (Issued > DateTime.UtcNow || Expires < DateTime.UtcNow)
             {
                 return false;
             }
 
-            if(Version >= 1 && Version <= 5)
+            if (Version >= 1 && Version <= 8)
             {
                 var valid =
                     globalSettings.Installation.Id == InstallationId &&
@@ -203,24 +216,39 @@ namespace Bit.Core.Models.Business
                     organization.SelfHost == SelfHost &&
                     organization.Name.Equals(Name);
 
-                if(valid && Version >= 2)
+                if (valid && Version >= 2)
                 {
                     valid = organization.UsersGetPremium == UsersGetPremium;
                 }
 
-                if(valid && Version >= 3)
+                if (valid && Version >= 3)
                 {
                     valid = organization.UseEvents == UseEvents;
                 }
 
-                if(valid && Version >= 4)
+                if (valid && Version >= 4)
                 {
                     valid = organization.Use2fa == Use2fa;
                 }
 
-                if(valid && Version >= 5)
+                if (valid && Version >= 5)
                 {
                     valid = organization.UseApi == UseApi;
+                }
+
+                if (valid && Version >= 6)
+                {
+                    valid = organization.UsePolicies == UsePolicies;
+                }
+
+                if (valid && Version >= 7)
+                {
+                    valid = organization.UseSso == UseSso;
+                }
+                
+                if (valid && Version >= 8)
+                {
+                    valid = organization.UseResetPassword == UseResetPassword;
                 }
 
                 return valid;
@@ -233,7 +261,7 @@ namespace Bit.Core.Models.Business
 
         public bool VerifySignature(X509Certificate2 certificate)
         {
-            using(var rsa = certificate.GetRSAPublicKey())
+            using (var rsa = certificate.GetRSAPublicKey())
             {
                 return rsa.VerifyData(GetDataBytes(), SignatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             }
@@ -241,12 +269,12 @@ namespace Bit.Core.Models.Business
 
         public byte[] Sign(X509Certificate2 certificate)
         {
-            if(!certificate.HasPrivateKey)
+            if (!certificate.HasPrivateKey)
             {
                 throw new InvalidOperationException("You don't have the private key!");
             }
 
-            using(var rsa = certificate.GetRSAPrivateKey())
+            using (var rsa = certificate.GetRSAPrivateKey())
             {
                 return rsa.SignData(GetDataBytes(), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             }

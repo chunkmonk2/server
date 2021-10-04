@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Bit.Core;
+using Bit.Core.Context;
 using Bit.Core.Models.Api.Public;
 using Bit.Core.Repositories;
 using Bit.Core.Services;
@@ -18,12 +18,12 @@ namespace Bit.Api.Public.Controllers
     {
         private readonly IGroupRepository _groupRepository;
         private readonly IGroupService _groupService;
-        private readonly CurrentContext _currentContext;
+        private readonly ICurrentContext _currentContext;
 
         public GroupsController(
             IGroupRepository groupRepository,
             IGroupService groupService,
-            CurrentContext currentContext)
+            ICurrentContext currentContext)
         {
             _groupRepository = groupRepository;
             _groupService = groupService;
@@ -45,7 +45,7 @@ namespace Bit.Api.Public.Controllers
         {
             var groupDetails = await _groupRepository.GetByIdWithCollectionsAsync(id);
             var group = groupDetails?.Item1;
-            if(group == null || group.OrganizationId != _currentContext.OrganizationId)
+            if (group == null || group.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -67,7 +67,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> GetMemberIds(Guid id)
         {
             var group = await _groupRepository.GetByIdAsync(id);
-            if(group == null || group.OrganizationId != _currentContext.OrganizationId)
+            if (group == null || group.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -128,7 +128,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> Put(Guid id, [FromBody]GroupCreateUpdateRequestModel model)
         {
             var existingGroup = await _groupRepository.GetByIdAsync(id);
-            if(existingGroup == null || existingGroup.OrganizationId != _currentContext.OrganizationId)
+            if (existingGroup == null || existingGroup.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -154,7 +154,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> PutMemberIds(Guid id, [FromBody]UpdateMemberIdsRequestModel model)
         {
             var existingGroup = await _groupRepository.GetByIdAsync(id);
-            if(existingGroup == null || existingGroup.OrganizationId != _currentContext.OrganizationId)
+            if (existingGroup == null || existingGroup.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -175,7 +175,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var group = await _groupRepository.GetByIdAsync(id);
-            if(group == null || group.OrganizationId != _currentContext.OrganizationId)
+            if (group == null || group.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }

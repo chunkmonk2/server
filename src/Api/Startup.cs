@@ -3,41 +3,49 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using Bit.Api.Utilities;
 using Bit.Core;
+using Bit.Core.Context;
 using Bit.Core.Identity;
+using Bit.Core.Settings;
 using Newtonsoft.Json.Serialization;
 using AspNetCoreRateLimit;
-using Serilog.Events;
 using Stripe;
 using Bit.Core.Utilities;
 using IdentityModel;
-using Microsoft.AspNetCore.HttpOverrides;
+using System.Globalization;
+using Microsoft.IdentityModel.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
+using System.Collections.Generic;
+using System;
+
+#if !OSS
+using Bit.CommCore.Utilities;
+#endif
 
 namespace Bit.Api
 {
     public class Startup
     {
-        public Startup(IHostingEnvironment env, IConfiguration configuration)
+        public Startup(IWebHostEnvironment env, IConfiguration configuration)
         {
+            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
             Configuration = configuration;
             Environment = env;
         }
 
         public IConfiguration Configuration { get; private set; }
-        public IHostingEnvironment Environment { get; set; }
+        public IWebHostEnvironment Environment { get; set; }
 
         public void ConfigureServices(IServiceCollection services)
         {
-            var provider = services.BuildServiceProvider();
-
             // Options
             services.AddOptions();
 
             // Settings
             var globalSettings = services.AddGlobalSettingsServices(Configuration);
-            if(!globalSettings.SelfHosted)
+            if (!globalSettings.SelfHosted)
             {
                 services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimitOptions"));
                 services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
@@ -46,14 +54,20 @@ namespace Bit.Api
             // Data Protection
             services.AddCustomDataProtectionServices(Environment, globalSettings);
 
+            // Event Grid
+            if (!string.IsNullOrWhiteSpace(globalSettings.EventGridKey))
+            {
+                ApiHelpers.EventGridKey = globalSettings.EventGridKey;
+            }
+
             // Stripe Billing
-            StripeConfiguration.SetApiKey(globalSettings.StripeApiKey);
+            StripeConfiguration.ApiKey = globalSettings.StripeApiKey;
 
             // Repositories
             services.AddSqlServerRepositories(globalSettings);
 
             // Context
-            services.AddScoped<CurrentContext>();
+            services.AddScoped<ICurrentContext, CurrentContext>();
 
             // Caching
             services.AddMemoryCache();
@@ -61,7 +75,7 @@ namespace Bit.Api
             // BitPay
             services.AddSingleton<BitPayClient>();
 
-            if(!globalSettings.SelfHosted)
+            if (!globalSettings.SelfHosted)
             {
                 // Rate limiting
                 services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
@@ -75,13 +89,13 @@ namespace Bit.Api
                 config.AddPolicy("Application", policy =>
                 {
                     policy.RequireAuthenticatedUser();
-                    policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application");
+                    policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application", "external");
                     policy.RequireClaim(JwtClaimTypes.Scope, "api");
                 });
                 config.AddPolicy("Web", policy =>
                 {
                     policy.RequireAuthenticatedUser();
-                    policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application");
+                    policy.RequireClaim(JwtClaimTypes.AuthenticationMethod, "Application", "external");
                     policy.RequireClaim(JwtClaimTypes.Scope, "api");
                     policy.RequireClaim(JwtClaimTypes.ClientId, "web");
                 });
@@ -107,29 +121,38 @@ namespace Bit.Api
             // Services
             services.AddBaseServices();
             services.AddDefaultServices(globalSettings);
+            services.AddCoreLocalizationServices();
+
+            #if OSS
+                services.AddOosServices();
+            #else
+                services.AddCommCoreServices();
+            #endif
 
             // MVC
             services.AddMvc(config =>
             {
                 config.Conventions.Add(new ApiExplorerGroupConvention());
                 config.Conventions.Add(new PublicApiControllersModelConvention());
-            }).AddJsonOptions(options =>
+            }).AddNewtonsoftJson(options =>
             {
-                if(Environment.IsProduction() && Configuration["swaggerGen"] != "true")
+                if ((Environment.IsProduction() || Environment.IsEnvironment("QA")) && Configuration["swaggerGen"] != "true")
                 {
                     options.SerializerSettings.ContractResolver = new DefaultContractResolver();
                 }
             });
 
             services.AddSwagger(globalSettings);
+            Jobs.JobsHostedService.AddJobsServices(services);
+            services.AddHostedService<Jobs.JobsHostedService>();
 
-            if(globalSettings.SelfHosted)
+            if (globalSettings.SelfHosted)
             {
                 // Jobs service
                 Jobs.JobsHostedService.AddJobsServices(services);
                 services.AddHostedService<Jobs.JobsHostedService>();
             }
-            if(CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ConnectionString) &&
+            if (CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ConnectionString) &&
                 CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ApplicationCacheTopicName))
             {
                 services.AddHostedService<Core.HostedServices.ApplicationCacheHostedService>();
@@ -138,38 +161,18 @@ namespace Bit.Api
 
         public void Configure(
             IApplicationBuilder app,
-            IHostingEnvironment env,
-            ILoggerFactory loggerFactory,
-            IApplicationLifetime appLifetime,
-            GlobalSettings globalSettings)
+            IWebHostEnvironment env,
+            IHostApplicationLifetime appLifetime,
+            GlobalSettings globalSettings,
+            ILogger<Startup> logger)
         {
-            loggerFactory.AddSerilog(app, env, appLifetime, globalSettings, (e) =>
-            {
-                var context = e.Properties["SourceContext"].ToString();
-                if(e.Exception != null && (e.Exception.GetType() == typeof(SecurityTokenValidationException) ||
-                    e.Exception.Message == "Bad security stamp."))
-                {
-                    return false;
-                }
-
-                if(e.Level == LogEventLevel.Information && context.Contains(typeof(IpRateLimitMiddleware).FullName))
-                {
-                    return true;
-                }
-
-                if(context.Contains("IdentityServer4.Validation.TokenValidator") ||
-                    context.Contains("IdentityServer4.Validation.TokenRequestValidator"))
-                {
-                    return e.Level > LogEventLevel.Error;
-                }
-
-                return e.Level >= LogEventLevel.Error;
-            });
+            IdentityModelEventSource.ShowPII = true;
+            app.UseSerilog(env, appLifetime, globalSettings);
 
             // Default Middleware
-            app.UseDefaultMiddleware(env);
+            app.UseDefaultMiddleware(env, globalSettings);
 
-            if(!globalSettings.SelfHosted)
+            if (!globalSettings.SelfHosted)
             {
                 // Rate limiting
                 app.UseMiddleware<CustomIpRateLimitMiddleware>();
@@ -179,30 +182,40 @@ namespace Bit.Api
                 app.UseForwardedHeaders(globalSettings);
             }
 
+            // Add localization
+            app.UseCoreLocalization();
+
             // Add static files to the request pipeline.
             app.UseStaticFiles();
 
-            // Add Cors
-            app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+            // Add routing
+            app.UseRouting();
 
-            // Add authentication to the request pipeline.
+            // Add Cors
+            app.UseCors(policy => policy.SetIsOriginAllowed(o => CoreHelpers.IsCorsOriginAllowed(o, globalSettings))
+                .AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+
+            // Add authentication and authorization to the request pipeline.
             app.UseAuthentication();
+            app.UseAuthorization();
 
             // Add current context
             app.UseMiddleware<CurrentContextMiddleware>();
 
-            // Add MVC to the request pipeline.
-            app.UseMvc();
+            // Add endpoints to the request pipeline.
+            app.UseEndpoints(endpoints => endpoints.MapDefaultControllerRoute());
 
             // Add Swagger
-            if(Environment.IsDevelopment() || globalSettings.SelfHosted)
+            if (Environment.IsDevelopment() || globalSettings.SelfHosted)
             {
                 app.UseSwagger(config =>
                 {
                     config.RouteTemplate = "specs/{documentName}/swagger.json";
-                    var host = globalSettings.BaseServiceUri.Api.Replace("https://", string.Empty)
-                        .Replace("http://", string.Empty);
-                    config.PreSerializeFilters.Add((swaggerDoc, httpReq) => swaggerDoc.Host = host);
+                    config.PreSerializeFilters.Add((swaggerDoc, httpReq) =>
+                        swaggerDoc.Servers = new List<OpenApiServer>
+                        {
+                            new OpenApiServer { Url = globalSettings.BaseServiceUri.Api }
+                        });
                 });
                 app.UseSwaggerUI(config =>
                 {
@@ -214,6 +227,9 @@ namespace Bit.Api
                     config.OAuthClientSecret("secretKey");
                 });
             }
+
+            // Log startup
+            logger.LogInformation(Constants.BypassFiltersEventId, globalSettings.ProjectName + " started.");
         }
     }
 }

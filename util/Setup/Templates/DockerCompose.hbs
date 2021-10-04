@@ -20,6 +20,7 @@ services:
     image: chunkmonk2/mssql:{{{CoreVersion}}}
     container_name: bitwarden-mssql
     restart: always
+    stop_grace_period: 60s
     volumes:
 {{#if MssqlDataDockerVolume}}
       - mssql_data:/var/opt/mssql/data
@@ -65,6 +66,9 @@ services:
       - global.env
       - ../env/uid.env
       - ../env/global.override.env
+    networks:
+      - default
+      - public
 
   identity:
     image: chunkmonk2/identity:{{{CoreVersion}}}
@@ -79,6 +83,26 @@ services:
       - global.env
       - ../env/uid.env
       - ../env/global.override.env
+    networks:
+      - default
+      - public
+
+  sso:
+    image: bitwarden/sso:{{{CoreVersion}}}
+    container_name: bitwarden-sso
+    restart: always
+    volumes:
+      - ../identity:/etc/bitwarden/identity
+      - ../core:/etc/bitwarden/core
+      - ../ca-certificates:/etc/bitwarden/ca-certificates
+      - ../logs/sso:/etc/bitwarden/logs
+    env_file:
+      - global.env
+      - ../env/uid.env
+      - ../env/global.override.env
+    networks:
+      - default
+      - public
 
   admin:
     image: chunkmonk2/admin:{{{CoreVersion}}}
@@ -94,6 +118,27 @@ services:
       - global.env
       - ../env/uid.env
       - ../env/global.override.env
+    networks:
+      - default
+      - public
+
+  portal:
+    image: bitwarden/portal:{{{CoreVersion}}}
+    container_name: bitwarden-portal
+    restart: always
+    depends_on:
+      - mssql
+    volumes:
+      - ../core:/etc/bitwarden/core
+      - ../ca-certificates:/etc/bitwarden/ca-certificates
+      - ../logs/portal:/etc/bitwarden/logs
+    env_file:
+      - global.env
+      - ../env/uid.env
+      - ../env/global.override.env
+    networks:
+      - default
+      - public
 
   icons:
     image: chunkmonk2/icons:{{{CoreVersion}}}
@@ -105,6 +150,9 @@ services:
     env_file:
       - global.env
       - ../env/uid.env
+    networks:
+      - default
+      - public
 
   notifications:
     image: chunkmonk2/notifications:{{{CoreVersion}}}
@@ -117,6 +165,24 @@ services:
       - global.env
       - ../env/uid.env
       - ../env/global.override.env
+    networks:
+      - default
+      - public
+
+  events:
+    image: bitwarden/events:{{{CoreVersion}}}
+    container_name: bitwarden-events
+    restart: always
+    volumes:
+      - ../ca-certificates:/etc/bitwarden/ca-certificates
+      - ../logs/events:/etc/bitwarden/logs
+    env_file:
+      - global.env
+      - ../env/uid.env
+      - ../env/global.override.env
+    networks:
+      - default
+      - public
 
   nginx:
     image: chunkmonk2/nginx:{{{CoreVersion}}}
@@ -143,8 +209,17 @@ services:
       - ../logs/nginx:/var/log/nginx
     env_file:
       - ../env/uid.env
+    networks:
+      - default
+      - public
 {{#if MssqlDataDockerVolume}}
 
 volumes:
   mssql_data:
 {{/if}}
+
+networks:
+  default:
+    internal: true
+  public:
+    internal: false

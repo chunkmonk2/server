@@ -8,19 +8,26 @@ namespace Bit.Core.Services
     public interface IPaymentService
     {
         Task CancelAndRecoverChargesAsync(ISubscriber subscriber);
-        Task PurchaseOrganizationAsync(Organization org, PaymentMethodType paymentMethodType, string paymentToken,
-            Models.StaticStore.Plan plan, short additionalStorageGb, short additionalSeats, bool premiumAccessAddon);
-        Task UpgradeFreeOrganizationAsync(Organization org, Models.StaticStore.Plan plan,
-           short additionalStorageGb, short additionalSeats, bool premiumAccessAddon);
-        Task PurchasePremiumAsync(User user, PaymentMethodType paymentMethodType, string paymentToken,
-            short additionalStorageGb);
-        Task AdjustStorageAsync(IStorableSubscriber storableSubscriber, int additionalStorage, string storagePlanId);
-        Task CancelSubscriptionAsync(ISubscriber subscriber, bool endOfPeriod = false);
+        Task<string> PurchaseOrganizationAsync(Organization org, PaymentMethodType paymentMethodType,
+            string paymentToken, Models.StaticStore.Plan plan, short additionalStorageGb, int additionalSeats,
+            bool premiumAccessAddon, TaxInfo taxInfo);
+        Task<string> UpgradeFreeOrganizationAsync(Organization org, Models.StaticStore.Plan plan,
+           short additionalStorageGb, int additionalSeats, bool premiumAccessAddon, TaxInfo taxInfo);
+        Task<string> PurchasePremiumAsync(User user, PaymentMethodType paymentMethodType, string paymentToken,
+            short additionalStorageGb, TaxInfo taxInfo);
+        Task<string> AdjustStorageAsync(IStorableSubscriber storableSubscriber, int additionalStorage, string storagePlanId);
+        Task CancelSubscriptionAsync(ISubscriber subscriber, bool endOfPeriod = false,
+            bool skipInAppPurchaseCheck = false);
         Task ReinstateSubscriptionAsync(ISubscriber subscriber);
         Task<bool> UpdatePaymentMethodAsync(ISubscriber subscriber, PaymentMethodType paymentMethodType,
-            string paymentToken);
+            string paymentToken, bool allowInAppPurchases = false, TaxInfo taxInfo = null);
         Task<bool> CreditAccountAsync(ISubscriber subscriber, decimal creditAmount);
         Task<BillingInfo> GetBillingAsync(ISubscriber subscriber);
         Task<SubscriptionInfo> GetSubscriptionAsync(ISubscriber subscriber);
+        Task<TaxInfo> GetTaxInfoAsync(ISubscriber subscriber);
+        Task SaveTaxInfoAsync(ISubscriber subscriber, TaxInfo taxInfo);
+        Task<TaxRate> CreateTaxRateAsync(TaxRate taxRate);
+        Task UpdateTaxRateAsync(TaxRate taxRate);
+        Task ArchiveTaxRateAsync(TaxRate taxRate);
     }
 }

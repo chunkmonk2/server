@@ -24,6 +24,8 @@ SELECT
             OR C.[Folders] IS NULL
         THEN NULL
         ELSE TRY_CONVERT(UNIQUEIDENTIFIER, JSON_VALUE(C.[Folders], CONCAT('$."', @UserId, '"')))
-    END [FolderId]
+    END [FolderId],
+    C.[DeletedDate],
+    C.[Reprompt]
 FROM
     [dbo].[Cipher] C

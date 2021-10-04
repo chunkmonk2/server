@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Bit.Core;
+using Bit.Core.Context;
+using Bit.Core.Settings;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Bit.Notifications
@@ -19,11 +20,11 @@ namespace Bit.Notifications
 
         public override async Task OnConnectedAsync()
         {
-            var currentContext = new CurrentContext();
-            currentContext.Build(Context.User, _globalSettings);
-            if(currentContext.Organizations != null)
+            var currentContext = new CurrentContext(null);
+            await currentContext.BuildAsync(Context.User, _globalSettings);
+            if (currentContext.Organizations != null)
             {
-                foreach(var org in currentContext.Organizations)
+                foreach (var org in currentContext.Organizations)
                 {
                     await Groups.AddToGroupAsync(Context.ConnectionId, $"Organization_{org.Id}");
                 }
@@ -34,11 +35,11 @@ namespace Bit.Notifications
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            var currentContext = new CurrentContext();
-            currentContext.Build(Context.User, _globalSettings);
-            if(currentContext.Organizations != null)
+            var currentContext = new CurrentContext(null);
+            await currentContext.BuildAsync(Context.User, _globalSettings);
+            if (currentContext.Organizations != null)
             {
-                foreach(var org in currentContext.Organizations)
+                foreach (var org in currentContext.Organizations)
                 {
                     await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Organization_{org.Id}");
                 }

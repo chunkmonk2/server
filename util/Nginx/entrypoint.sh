@@ -30,7 +30,7 @@ mkhomedir_helper $USERNAME
 # The rest...
 
 chown -R $USERNAME:$GROUPNAME /etc/bitwarden
-cp /etc/bitwarden/nginx/default.conf /etc/nginx/conf.d/default.conf
+cp /etc/bitwarden/nginx/*.conf /etc/nginx/conf.d/
 mkdir -p /etc/letsencrypt
 chown -R $USERNAME:$GROUPNAME /etc/letsencrypt
 mkdir -p /etc/ssl
@@ -40,5 +40,8 @@ touch /var/run/nginx/nginx.pid
 chown -R $USERNAME:$GROUPNAME /var/run/nginx
 chown -R $USERNAME:$GROUPNAME /var/cache/nginx
 chown -R $USERNAME:$GROUPNAME /var/log/nginx
+
+# Launch a loop to rotate nginx logs on a daily basis
+gosu $USERNAME:$GROUPNAME /bin/sh -c "/logrotate.sh loop >/dev/null 2>&1 &"
 
 exec gosu $USERNAME:$GROUPNAME nginx -g 'daemon off;'

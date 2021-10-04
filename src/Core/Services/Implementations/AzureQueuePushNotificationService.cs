@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Bit.Core.Models.Table;
+using Bit.Core.Context;
 using Bit.Core.Enums;
-using Newtonsoft.Json;
 using Bit.Core.Models;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage;
+using Bit.Core.Models.Table;
+using Bit.Core.Settings;
+using Newtonsoft.Json;
+using Azure.Storage.Queues;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 
@@ -13,7 +14,7 @@ namespace Bit.Core.Services
 {
     public class AzureQueuePushNotificationService : IPushNotificationService
     {
-        private readonly CloudQueue _queue;
+        private readonly QueueClient _queueClient;
         private readonly GlobalSettings _globalSettings;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -26,9 +27,7 @@ namespace Bit.Core.Services
             GlobalSettings globalSettings,
             IHttpContextAccessor httpContextAccessor)
         {
-            var storageAccount = CloudStorageAccount.Parse(globalSettings.Notifications.ConnectionString);
-            var queueClient = storageAccount.CreateCloudQueueClient();
-            _queue = queueClient.GetQueueReference("notifications");
+            _queueClient = new QueueClient(globalSettings.Notifications.ConnectionString, "notifications");
             _globalSettings = globalSettings;
             _httpContextAccessor = httpContextAccessor;
         }
@@ -50,7 +49,7 @@ namespace Bit.Core.Services
 
         private async Task PushCipherAsync(Cipher cipher, PushType type, IEnumerable<Guid> collectionIds)
         {
-            if(cipher.OrganizationId.HasValue)
+            if (cipher.OrganizationId.HasValue)
             {
                 var message = new SyncCipherPushNotification
                 {
@@ -62,7 +61,7 @@ namespace Bit.Core.Services
 
                 await SendMessageAsync(type, message, true);
             }
-            else if(cipher.UserId.HasValue)
+            else if (cipher.UserId.HasValue)
             {
                 var message = new SyncCipherPushNotification
                 {
@@ -138,24 +137,53 @@ namespace Bit.Core.Services
             await SendMessageAsync(type, message, false);
         }
 
+        public async Task PushSyncSendCreateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendCreate);
+        }
+
+        public async Task PushSyncSendUpdateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendUpdate);
+        }
+
+        public async Task PushSyncSendDeleteAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendDelete);
+        }
+
+        private async Task PushSendAsync(Send send, PushType type)
+        {
+            if (send.UserId.HasValue)
+            {
+                var message = new SyncSendPushNotification
+                {
+                    Id = send.Id,
+                    UserId = send.UserId.Value,
+                    RevisionDate = send.RevisionDate
+                };
+
+                await SendMessageAsync(type, message, true);
+            }
+        }
+
         private async Task SendMessageAsync<T>(PushType type, T payload, bool excludeCurrentContext)
         {
             var contextId = GetContextIdentifier(excludeCurrentContext);
             var message = JsonConvert.SerializeObject(new PushNotificationData<T>(type, payload, contextId),
                 _jsonSettings);
-            var queueMessage = new CloudQueueMessage(message);
-            await _queue.AddMessageAsync(queueMessage);
+            await _queueClient.SendMessageAsync(message);
         }
 
         private string GetContextIdentifier(bool excludeCurrentContext)
         {
-            if(!excludeCurrentContext)
+            if (!excludeCurrentContext)
             {
                 return null;
             }
 
             var currentContext = _httpContextAccessor?.HttpContext?.
-                RequestServices.GetService(typeof(CurrentContext)) as CurrentContext;
+                RequestServices.GetService(typeof(ICurrentContext)) as ICurrentContext;
             return currentContext?.DeviceIdentifier;
         }
 

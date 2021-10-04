@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
+using Bit.Core.Context;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Utilities
 {
@@ -12,9 +14,9 @@ namespace Bit.Core.Utilities
             _next = next;
         }
 
-        public async Task Invoke(HttpContext httpContext, CurrentContext currentContext, GlobalSettings globalSettings)
+        public async Task Invoke(HttpContext httpContext, ICurrentContext currentContext, GlobalSettings globalSettings)
         {
-            currentContext.Build(httpContext, globalSettings);
+            await currentContext.BuildAsync(httpContext, globalSettings);
             await _next.Invoke(httpContext);
         }
     }

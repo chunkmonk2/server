@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace Bit.Core.Models.Table
 {
-    public class Cipher : ITableObject<Guid>
+    public class Cipher : ITableObject<Guid>, ICloneable
     {
         private Dictionary<string, CipherAttachment.MetaData> _attachmentData;
 
@@ -20,6 +20,8 @@ namespace Bit.Core.Models.Table
         public string Attachments { get; set; }
         public DateTime CreationDate { get; internal set; } = DateTime.UtcNow;
         public DateTime RevisionDate { get; internal set; } = DateTime.UtcNow;
+        public DateTime? DeletedDate { get; internal set; }
+        public Enums.CipherRepromptType? Reprompt { get; set; }
 
         public void SetNewId()
         {
@@ -28,12 +30,12 @@ namespace Bit.Core.Models.Table
 
         public Dictionary<string, CipherAttachment.MetaData> GetAttachments()
         {
-            if(string.IsNullOrWhiteSpace(Attachments))
+            if (string.IsNullOrWhiteSpace(Attachments))
             {
                 return null;
             }
 
-            if(_attachmentData != null)
+            if (_attachmentData != null)
             {
                 return _attachmentData;
             }
@@ -41,6 +43,10 @@ namespace Bit.Core.Models.Table
             try
             {
                 _attachmentData = JsonConvert.DeserializeObject<Dictionary<string, CipherAttachment.MetaData>>(Attachments);
+                foreach (var kvp in _attachmentData)
+                {
+                    kvp.Value.AttachmentId = kvp.Key;
+                }
                 return _attachmentData;
             }
             catch
@@ -51,7 +57,7 @@ namespace Bit.Core.Models.Table
 
         public void SetAttachments(Dictionary<string, CipherAttachment.MetaData> data)
         {
-            if(data == null || data.Count == 0)
+            if (data == null || data.Count == 0)
             {
                 _attachmentData = null;
                 Attachments = null;
@@ -65,7 +71,7 @@ namespace Bit.Core.Models.Table
         public void AddAttachment(string id, CipherAttachment.MetaData data)
         {
             var attachments = GetAttachments();
-            if(attachments == null)
+            if (attachments == null)
             {
                 attachments = new Dictionary<string, CipherAttachment.MetaData>();
             }
@@ -77,7 +83,7 @@ namespace Bit.Core.Models.Table
         public void DeleteAttachment(string id)
         {
             var attachments = GetAttachments();
-            if(!attachments?.ContainsKey(id) ?? true)
+            if (!attachments?.ContainsKey(id) ?? true)
             {
                 return;
             }
@@ -90,6 +96,16 @@ namespace Bit.Core.Models.Table
         {
             var attachments = GetAttachments();
             return attachments?.ContainsKey(id) ?? false;
+        }
+
+        object ICloneable.Clone() => Clone();
+        public Cipher Clone()
+        {
+            var clone = CoreHelpers.CloneObject(this);
+            clone.CreationDate = CreationDate;
+            clone.RevisionDate = RevisionDate;
+
+            return clone;
         }
     }
 }

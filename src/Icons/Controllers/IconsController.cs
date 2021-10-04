@@ -11,6 +11,14 @@ namespace Bit.Icons.Controllers
     [Route("")]
     public class IconsController : Controller
     {
+        // Basic fa-globe icon
+        private static readonly byte[] _notFoundImage = Convert.FromBase64String("iVBORw0KGgoAAAANSUhE" +
+            "UgAAABEAAAARCAQAAACRZI9xAAABH0lEQVQoz2WQv0sDQRCF351C4g9QkXCgIkJAEREExUpJbyFoK6nSRLT/GgtLOxE" +
+            "sgoX/QLAL2Alin0YkICJicQhHCrEIEsJYZLnsxVfNzH779s1KToTsUqNFzAOnRBoWyyS0+aSO0cEwrhnxgUOMMjOMk2" +
+            "eVOwzDeCE/cDDWXD2B0aFAnR7GPUE/Q8KJ5zjHDYHEFr8YB5IoYbymlpIIJaap0sVICMQthpEbil9xeYxIxBjGQgY4S" +
+            "wFjW27FD6bccUCBbw8piWdXNliRuKRLzQOMdXGeNj+E7FDOAMakKHptk30iHr3JU//1RuZWiysWWXKRi30kT5KBviSJ" +
+            "MWKOB0vO8uYhVUJKtCH7VaNcpEhMj3c29F/k2OSICnvM+/M/XGfnuYOrfEAAAAAASUVORK5CYII=");
+
         private readonly IMemoryCache _memoryCache;
         private readonly IDomainMappingService _domainMappingService;
         private readonly IIconFetchingService _iconFetchingService;
@@ -31,16 +39,34 @@ namespace Bit.Icons.Controllers
             _iconsSettings = iconsSettings;
         }
 
+        [HttpGet("~/alive")]
+        [HttpGet("~/now")]
+        public DateTime GetAlive()
+        {
+            return DateTime.UtcNow;
+        }
+
+        [HttpGet("~/config")]
+        public IActionResult GetConfig()
+        {
+            return new JsonResult(new
+            {
+                CacheEnabled = _iconsSettings.CacheEnabled,
+                CacheHours = _iconsSettings.CacheHours,
+                CacheSizeLimit = _iconsSettings.CacheSizeLimit
+            });
+        }
+
         [HttpGet("{hostname}/icon.png")]
         public async Task<IActionResult> Get(string hostname)
         {
-            if(string.IsNullOrWhiteSpace(hostname) || !hostname.Contains("."))
+            if (string.IsNullOrWhiteSpace(hostname) || !hostname.Contains("."))
             {
                 return new BadRequestResult();
             }
 
             var url = $"http://{hostname}";
-            if(!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
                 return new BadRequestResult();
             }
@@ -53,10 +79,10 @@ namespace Bit.Icons.Controllers
             //}
 
             var mappedDomain = _domainMappingService.MapDomain(domain);
-            if(!_iconsSettings.CacheEnabled || !_memoryCache.TryGetValue(mappedDomain, out Icon icon))
+            if (!_iconsSettings.CacheEnabled || !_memoryCache.TryGetValue(mappedDomain, out Icon icon))
             {
                 var result = await _iconFetchingService.GetIconAsync(domain);
-                if(result == null)
+                if (result == null)
                 {
                     _logger.LogWarning("Null result returned for {0}.", domain);
                     icon = null;
@@ -67,7 +93,7 @@ namespace Bit.Icons.Controllers
                 }
 
                 // Only cache not found and smaller images (<= 50kb)
-                if(_iconsSettings.CacheEnabled && (icon == null || icon.Image.Length <= 50012))
+                if (_iconsSettings.CacheEnabled && (icon == null || icon.Image.Length <= 50012))
                 {
                     _logger.LogInformation("Cache icon for {0}.", domain);
                     _memoryCache.Set(mappedDomain, icon, new MemoryCacheEntryOptions
@@ -79,9 +105,9 @@ namespace Bit.Icons.Controllers
                 }
             }
 
-            if(icon == null)
+            if (icon == null)
             {
-                return new NotFoundResult();
+                return new FileContentResult(_notFoundImage, "image/png");
             }
 
             return new FileContentResult(icon.Image, icon.Format);

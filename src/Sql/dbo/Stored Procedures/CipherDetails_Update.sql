@@ -12,7 +12,10 @@
     @FolderId UNIQUEIDENTIFIER,
     @Favorite BIT,
     @Edit BIT, -- not used
-    @OrganizationUseTotp BIT -- not used
+    @ViewPassword BIT, -- not used
+    @OrganizationUseTotp BIT, -- not used
+    @DeletedDate DATETIME2(2),
+    @Reprompt TINYINT
 AS
 BEGIN
     SET NOCOUNT ON
@@ -45,8 +48,10 @@ BEGIN
             ELSE
                 JSON_MODIFY([Favorites], @UserIdPath, NULL)
             END,
+        [Reprompt] = @Reprompt,
         [CreationDate] = @CreationDate,
-        [RevisionDate] = @RevisionDate
+        [RevisionDate] = @RevisionDate,
+        [DeletedDate] = @DeletedDate
     WHERE
         [Id] = @Id
 

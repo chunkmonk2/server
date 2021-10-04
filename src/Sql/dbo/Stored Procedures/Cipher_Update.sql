@@ -8,7 +8,9 @@
     @Folders NVARCHAR(MAX),
     @Attachments NVARCHAR(MAX),
     @CreationDate DATETIME2(7),
-    @RevisionDate DATETIME2(7)
+    @RevisionDate DATETIME2(7),
+    @DeletedDate DATETIME2(7),
+    @Reprompt TINYINT
 AS
 BEGIN
     SET NOCOUNT ON
@@ -24,7 +26,9 @@ BEGIN
         [Folders] = @Folders,
         [Attachments] = @Attachments,
         [CreationDate] = @CreationDate,
-        [RevisionDate] = @RevisionDate
+        [RevisionDate] = @RevisionDate,
+        [DeletedDate] = @DeletedDate,
+        [Reprompt] = @Reprompt
     WHERE
         [Id] = @Id
 

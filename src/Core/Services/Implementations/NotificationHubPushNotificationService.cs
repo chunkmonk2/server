@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Bit.Core.Models.Table;
 using Microsoft.Azure.NotificationHubs;
+using Bit.Core.Context;
 using Bit.Core.Enums;
 using Newtonsoft.Json;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Bit.Core.Models;
 using Bit.Core.Models.Data;
 using Bit.Core.Repositories;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Services
 {
@@ -50,7 +52,7 @@ namespace Bit.Core.Services
 
         private async Task PushCipherAsync(Cipher cipher, PushType type, IEnumerable<Guid> collectionIds)
         {
-            if(cipher.OrganizationId.HasValue)
+            if (cipher.OrganizationId.HasValue)
             {
                 // We cannot send org pushes since access logic is much more complicated than just the fact that they belong
                 // to the organization. Potentially we could blindly send to just users that have the access all permission
@@ -59,7 +61,7 @@ namespace Bit.Core.Services
 
                 // await SendPayloadToOrganizationAsync(cipher.OrganizationId.Value, type, message, true);
             }
-            else if(cipher.UserId.HasValue)
+            else if (cipher.UserId.HasValue)
             {
                 var message = new SyncCipherPushNotification
                 {
@@ -136,6 +138,36 @@ namespace Bit.Core.Services
             await SendPayloadToUserAsync(userId, type, message, false);
         }
 
+        public async Task PushSyncSendCreateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendCreate);
+        }
+
+        public async Task PushSyncSendUpdateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendUpdate);
+        }
+
+        public async Task PushSyncSendDeleteAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendDelete);
+        }
+
+        private async Task PushSendAsync(Send send, PushType type)
+        {
+            if (send.UserId.HasValue)
+            {
+                var message = new SyncSendPushNotification
+                {
+                    Id = send.Id,
+                    UserId = send.UserId.Value,
+                    RevisionDate = send.RevisionDate
+                };
+
+                await SendPayloadToUserAsync(message.UserId, type, message, true);
+            }
+        }
+
         private async Task SendPayloadToUserAsync(Guid userId, PushType type, object payload, bool excludeCurrentContext)
         {
             await SendPayloadToUserAsync(userId.ToString(), type, payload, GetContextIdentifier(excludeCurrentContext));
@@ -151,7 +183,7 @@ namespace Bit.Core.Services
         {
             var tag = BuildTag($"template:payload_userId:{userId}", identifier);
             await SendPayloadAsync(tag, type, payload);
-            if(InstallationDeviceEntity.IsInstallationDeviceId(deviceId))
+            if (InstallationDeviceEntity.IsInstallationDeviceId(deviceId))
             {
                 await _installationDeviceRepository.UpsertAsync(new InstallationDeviceEntity(deviceId));
             }
@@ -162,7 +194,7 @@ namespace Bit.Core.Services
         {
             var tag = BuildTag($"template:payload && organizationId:{orgId}", identifier);
             await SendPayloadAsync(tag, type, payload);
-            if(InstallationDeviceEntity.IsInstallationDeviceId(deviceId))
+            if (InstallationDeviceEntity.IsInstallationDeviceId(deviceId))
             {
                 await _installationDeviceRepository.UpsertAsync(new InstallationDeviceEntity(deviceId));
             }
@@ -170,19 +202,19 @@ namespace Bit.Core.Services
 
         private string GetContextIdentifier(bool excludeCurrentContext)
         {
-            if(!excludeCurrentContext)
+            if (!excludeCurrentContext)
             {
                 return null;
             }
 
             var currentContext = _httpContextAccessor?.HttpContext?.
-                RequestServices.GetService(typeof(CurrentContext)) as CurrentContext;
+                RequestServices.GetService(typeof(ICurrentContext)) as ICurrentContext;
             return currentContext?.DeviceIdentifier;
         }
 
         private string BuildTag(string tag, string identifier)
         {
-            if(!string.IsNullOrWhiteSpace(identifier))
+            if (!string.IsNullOrWhiteSpace(identifier))
             {
                 tag += $" && !deviceIdentifier:{identifier}";
             }

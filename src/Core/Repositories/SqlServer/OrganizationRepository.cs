@@ -7,6 +7,7 @@ using Dapper;
 using System.Linq;
 using System.Collections.Generic;
 using Bit.Core.Models.Data;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Repositories.SqlServer
 {
@@ -20,9 +21,22 @@ namespace Bit.Core.Repositories.SqlServer
             : base(connectionString, readOnlyConnectionString)
         { }
 
+        public async Task<Organization> GetByIdentifierAsync(string identifier)
+        {
+            using (var connection = new SqlConnection(ConnectionString))
+            {
+                var results = await connection.QueryAsync<Organization>(
+                    "[dbo].[Organization_ReadByIdentifier]",
+                    new { Identifier = identifier },
+                    commandType: CommandType.StoredProcedure);
+
+                return results.SingleOrDefault();
+            }
+        }
+
         public async Task<ICollection<Organization>> GetManyByEnabledAsync()
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Organization>(
                     "[dbo].[Organization_ReadByEnabled]",
@@ -34,7 +48,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Organization>> GetManyByUserIdAsync(Guid userId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Organization>(
                     "[dbo].[Organization_ReadByUserId]",
@@ -48,7 +62,7 @@ namespace Bit.Core.Repositories.SqlServer
         public async Task<ICollection<Organization>> SearchAsync(string name, string userEmail, bool? paid,
             int skip, int take)
         {
-            using(var connection = new SqlConnection(ReadOnlyConnectionString))
+            using (var connection = new SqlConnection(ReadOnlyConnectionString))
             {
                 var results = await connection.QueryAsync<Organization>(
                     "[dbo].[Organization_Search]",
@@ -62,7 +76,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task UpdateStorageAsync(Guid id)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 await connection.ExecuteAsync(
                     "[dbo].[Organization_UpdateStorage]",
@@ -74,7 +88,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<OrganizationAbility>> GetManyAbilitiesAsync()
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<OrganizationAbility>(
                     "[dbo].[Organization_ReadAbilities]",

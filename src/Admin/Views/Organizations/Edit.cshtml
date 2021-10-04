@@ -21,6 +21,8 @@
                 document.getElementById('@(nameof(Model.MaxCollections))').value = '';
                 document.getElementById('@(nameof(Model.MaxStorageGb))').value = '1';
                 // Features
+                document.getElementById('@(nameof(Model.UsePolicies))').checked = true;
+                document.getElementById('@(nameof(Model.UseSso))').checked = true;
                 document.getElementById('@(nameof(Model.UseGroups))').checked = true;
                 document.getElementById('@(nameof(Model.UseDirectory))').checked = true;
                 document.getElementById('@(nameof(Model.UseEvents))').checked = true;
@@ -29,9 +31,12 @@
                 document.getElementById('@(nameof(Model.Use2fa))').checked = true;
                 document.getElementById('@(nameof(Model.UseApi))').checked = true;
                 document.getElementById('@(nameof(Model.SelfHost))').checked = true;
+                document.getElementById('@(nameof(Model.UseResetPassword))').checked = true;
                 // Licensing
                 document.getElementById('@(nameof(Model.LicenseKey))').value = '@Model.RandomLicenseKey';
                 document.getElementById('@(nameof(Model.ExpirationDate))').value = '@Model.FourteenDayExpirationDate';
+                document.getElementById('@(nameof(Model.SalesAssistedTrialStarted))').value = true;
+
             });
 
             document.getElementById('@(nameof(Model.PlanType))').addEventListener('change', () => {
@@ -81,6 +86,7 @@
 @await Html.PartialAsync("_BillingInformation",
     new BillingInformationModel { BillingInfo = Model.BillingInfo, OrganizationId = Model.Organization.Id })
 <form method="post" id="edit-form">
+    <input asp-for="SalesAssistedTrialStarted" type="hidden">
     <h2>General</h2>
     <div class="row">
         <div class="col-sm">
@@ -161,12 +167,24 @@
         <label class="form-check-label" asp-for="UseGroups"></label>
     </div>
     <div class="form-check">
+        <input type="checkbox" class="form-check-input" asp-for="UsePolicies">
+        <label class="form-check-label" asp-for="UsePolicies"></label>
+    </div>
+    <div class="form-check">
+        <input type="checkbox" class="form-check-input" asp-for="UseSso">
+        <label class="form-check-label" asp-for="UseSso"></label>
+    </div>
+    <div class="form-check">
         <input type="checkbox" class="form-check-input" asp-for="UseDirectory">
         <label class="form-check-label" asp-for="UseDirectory"></label>
     </div>
     <div class="form-check">
         <input type="checkbox" class="form-check-input" asp-for="UseEvents">
         <label class="form-check-label" asp-for="UseEvents"></label>
+    </div>
+    <div class="form-check">
+        <input type="checkbox" class="form-check-input" asp-for="UseResetPassword">
+        <label class="form-check-label" asp-for="UseResetPassword"></label>
     </div>
     <div class="form-check mb-3">
         <input type="checkbox" class="form-check-input" asp-for="UsersGetPremium">
