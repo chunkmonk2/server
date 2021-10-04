@@ -52,7 +52,7 @@ namespace Bit.Core.Services
         private readonly ICurrentContext _currentContext;
         private readonly GlobalSettings _globalSettings;
         private readonly IOrganizationService _organizationService;
-        private readonly ISendRepository _sendRepository;
+        private readonly IProviderUserRepository _providerUserRepository;
 
         public UserService(
             IUserRepository userRepository,
@@ -81,7 +81,7 @@ namespace Bit.Core.Services
             ICurrentContext currentContext,
             GlobalSettings globalSettings,
             IOrganizationService organizationService,
-            ISendRepository sendRepository)
+            IProviderUserRepository providerUserRepository)
             : base(
                   store,
                   optionsAccessor,
@@ -115,7 +115,7 @@ namespace Bit.Core.Services
             _currentContext = currentContext;
             _globalSettings = globalSettings;
             _organizationService = organizationService;
-            _sendRepository = sendRepository;
+            _providerUserRepository = providerUserRepository;
         }
 
         public Guid? GetProperUserId(ClaimsPrincipal principal)
@@ -216,9 +216,18 @@ namespace Bit.Core.Services
                 {
                     return IdentityResult.Failed(new IdentityError
                     {
-                        Description = "You must leave or delete any organizations that you are the only owner of first."
+                        Description = "Cannot delete this user because it is the sole owner of at least one organization. Please delete these organizations or upgrade another user.",
                     });
                 }
+            }
+
+            var onlyOwnerProviderCount = await _providerUserRepository.GetCountByOnlyOwnerAsync(user.Id);
+            if (onlyOwnerProviderCount > 0)
+            {
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Description = "Cannot delete this user because it is the sole owner of at least one provider. Please delete these providers or upgrade another user.",
+                });
             }
 
             if (!string.IsNullOrWhiteSpace(user.GatewaySubscriptionId))
@@ -1297,24 +1306,18 @@ namespace Bit.Core.Services
 
         private async Task CheckPoliciesOnTwoFactorRemovalAsync(User user, IOrganizationService organizationService)
         {
-            var policies = await _policyRepository.GetManyByUserIdAsync(user.Id);
-            var twoFactorPolicies = policies.Where(p => p.Type == PolicyType.TwoFactorAuthentication && p.Enabled);
-            if (twoFactorPolicies.Any())
+            var twoFactorPolicies = await _policyRepository.GetManyByTypeApplicableToUserIdAsync(user.Id,
+                PolicyType.TwoFactorAuthentication);
+
+            var removeOrgUserTasks = twoFactorPolicies.Select(async p =>
             {
-                var userOrgs = await _organizationUserRepository.GetManyByUserAsync(user.Id);
-                var ownerOrgs = userOrgs.Where(o => o.Type == OrganizationUserType.Owner)
-                    .Select(o => o.OrganizationId).ToHashSet();
-                foreach (var policy in twoFactorPolicies)
-                {
-                    if (!ownerOrgs.Contains(policy.OrganizationId))
-                    {
-                        await organizationService.DeleteUserAsync(policy.OrganizationId, user.Id);
-                        var organization = await _organizationRepository.GetByIdAsync(policy.OrganizationId);
-                        await _mailService.SendOrganizationUserRemovedForPolicyTwoStepEmailAsync(
-                            organization.Name, user.Email);
-                    }
-                }
-            }
+                await organizationService.DeleteUserAsync(p.OrganizationId, user.Id);
+                var organization = await _organizationRepository.GetByIdAsync(p.OrganizationId);
+                await _mailService.SendOrganizationUserRemovedForPolicyTwoStepEmailAsync(
+                    organization.Name, user.Email);
+            }).ToArray();
+
+            await Task.WhenAll(removeOrgUserTasks);
         }
 
         public override async Task<IdentityResult> ConfirmEmailAsync(User user, string token)
