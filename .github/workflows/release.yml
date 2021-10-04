@@ -1,0 +1,130 @@
+---
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs: {}
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-20.04
+    outputs:
+      release_version: ${{ steps.version.outputs.package }}
+    steps:
+      - name: Branch check
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/rc" ]]; then
+            echo "==================================="
+            echo "[!] Can only release from rc branch"
+            echo "==================================="
+            exit 1
+          fi
+
+      - name: Checkout repo
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
+        with:
+          ref: rc
+
+      - name: Check Release Version
+        id: version
+        run: |
+          version=$( grep -o "<Version>.*</Version>" Directory.Build.props | grep -o "[0-9]*\.[0-9]*\.[0-9]*")
+          previous_release_tag_version=$(
+            curl -sL https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest | jq -r ".tag_name"
+          )
+
+          if [ "v$version" == "$previous_release_tag_version" ]; then
+            echo "[!] Already released v$version. Please bump version to continue"
+            exit 1
+          fi
+
+          echo "::set-output name=package::$version"
+
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-20.04
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Api
+          - name: Admin
+          - name: Billing
+          - name: Events
+          - name: Sso
+          - name: Portal
+          - name: Identity
+    steps:
+      - name: Setup
+        id: setup
+        run: |
+          NAME_LOWER=$(echo "${{ matrix.name }}" | awk '{print tolower($0)}')
+          echo "Matrix name: ${{ matrix.name }}"
+          echo "NAME_LOWER: $NAME_LOWER"
+          echo "::set-output name=name_lower::$NAME_LOWER"
+
+      - name: Download latest RC ${{ matrix.name }} asset
+        uses: bitwarden/gh-actions/download-artifacts@23433be15ed6fd046ce12b6889c5184a8d9c8783
+        with:
+          workflow: build.yml
+          workflow_conclusion: success
+          branch: rc
+          artifacts: ${{ matrix.name }}.zip
+
+      - name: Login to Azure
+        uses: Azure/login@77f1b2e3fb80c0e8645114159d17008b8a2e475a
+        with:
+          creds: ${{ secrets.AZURE_PROD_KV_CREDENTIALS }}
+
+      - name: Retrieve secrets
+        id: retrieve-secrets
+        env:
+          VAULT_NAME: "bitwarden-prod-kv"
+        run: |
+          webapp_name=$(
+            az keyvault secret show --vault-name $VAULT_NAME \
+              --name appservices-${{ steps.setup.outputs.name_lower }}-webapp-name \
+              --query value --output tsv
+          )
+          echo "::add-mask::$webapp_name"
+          echo "::set-output name=webapp-name::$webapp_name"
+
+      - name: Deploy App
+        uses: azure/webapps-deploy@798e43877120eda6a2a690a4f212c545e586ae31
+        with:
+          app-name: ${{ steps.retrieve-secrets.outputs.webapp-name }}
+          package: ./${{ matrix.name }}.zip
+          slot: "staging"
+
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-20.04
+    needs:
+      - setup
+      - deploy
+    steps:
+      - name: Download latest RC docker-stub
+        uses: bitwarden/gh-actions/download-artifacts@23433be15ed6fd046ce12b6889c5184a8d9c8783
+        with:
+          workflow: build.yml
+          workflow_conclusion: success
+          branch: rc
+          artifacts: "docker-stub.zip,
+                      swagger.json"
+
+      - name: Create release
+        uses: ncipollo/release-action@95215a3cb6e6a1908b3c44e00b4fdb15548b1e09
+        with:
+          artifacts: 'docker-stub.zip,
+                      swagger.json'
+          commit: ${{ github.sha }}
+          tag: "v${{ needs.setup.outputs.release_version }}"
+          name: "Version ${{ needs.setup.outputs.release_version }}"
+          body: "<insert release notes here>"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true

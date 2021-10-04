@@ -10,12 +10,19 @@ namespace Bit.Core.Models.Mail
         {
             get
             {
-                if(Uri.TryCreate(WebVaultUrl, UriKind.Absolute, out Uri uri))
+                if (Uri.TryCreate(WebVaultUrl, UriKind.Absolute, out Uri uri))
                 {
                     return uri.Host;
                 }
 
                 return WebVaultUrl;
+            }
+        }
+        public string CurrentYear
+        {
+            get
+            {
+                return DateTime.UtcNow.Year.ToString();
             }
         }
     }

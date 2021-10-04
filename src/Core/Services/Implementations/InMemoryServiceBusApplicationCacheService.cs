@@ -4,6 +4,7 @@ using Bit.Core.Enums;
 using Bit.Core.Models.Table;
 using Bit.Core.Repositories;
 using Bit.Core.Utilities;
+using Bit.Core.Settings;
 using Microsoft.Azure.ServiceBus;
 
 namespace Bit.Core.Services
@@ -15,8 +16,9 @@ namespace Bit.Core.Services
 
         public InMemoryServiceBusApplicationCacheService(
             IOrganizationRepository organizationRepository,
+            IProviderRepository providerRepository,
             GlobalSettings globalSettings)
-            : base(organizationRepository)
+            : base(organizationRepository, providerRepository)
         {
             _subName = CoreHelpers.GetApplicationCacheServiceBusSubcriptionName(globalSettings);
             _topicClient = new TopicClient(globalSettings.ServiceBus.ConnectionString,

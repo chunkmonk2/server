@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/core/runtime:2.1.10
+FROM mcr.microsoft.com/dotnet/aspnet:5.0
 
 LABEL com.bitwarden.product="bitwarden" com.bitwarden.project="setup"
 
@@ -9,7 +9,7 @@ RUN apt-get update \
 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY obj/Docker/publish .
+COPY obj/build-output/publish .
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 

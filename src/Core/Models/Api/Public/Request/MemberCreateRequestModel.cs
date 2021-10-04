@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Bit.Core.Models.Table;
+using Bit.Core.Utilities;
 
 namespace Bit.Core.Models.Api.Public
 {
@@ -11,7 +13,8 @@ namespace Bit.Core.Models.Api.Public
         /// </summary>
         /// <example>jsmith@example.com</example>
         [Required]
-        [EmailAddress]
+        [StringLength(256)]
+        [StrictEmailAddress]
         public string Email { get; set; }
 
         public override OrganizationUser ToOrganizationUser(OrganizationUser existingUser)

@@ -7,6 +7,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using Bit.Core.Enums;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Repositories.SqlServer
 {
@@ -22,7 +23,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Transaction>> GetManyByUserIdAsync(Guid userId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Transaction>(
                     $"[{Schema}].[Transaction_ReadByUserId]",
@@ -35,7 +36,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Transaction>> GetManyByOrganizationIdAsync(Guid organizationId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Transaction>(
                     $"[{Schema}].[Transaction_ReadByOrganizationId]",
@@ -48,7 +49,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<Transaction> GetByGatewayIdAsync(GatewayType gatewayType, string gatewayId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Transaction>(
                     $"[{Schema}].[Transaction_ReadByGatewayId]",

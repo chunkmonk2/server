@@ -43,21 +43,6 @@ then
     echo $LGID >>$ENV_DIR/uid.env
 fi
 
-# Backwards compat GID/UID for pre-1.20.0 installations
-if [[ "$COREVERSION" == *.*.* ]] &&
-   echo -e "1.19.0\n$COREVERSION" | sort -t '.' -k 1,1 -k 2,2 -k 3,3 -n | awk 'END {if($0!="1.19.0") {exit 1}}'
-then
-    LUID="LOCAL_UID=`id -u $USER`"
-    LGID="LOCAL_GID=`awk -F: '$1=="docker" {print $3}' /etc/group`"
-    if [ "$OS" == "mac" ]
-    then
-        LUID="LOCAL_UID=999"
-        LGID="LOCAL_GID=999"
-    fi
-    echo $LUID >$ENV_DIR/uid.env
-    echo $LGID >>$ENV_DIR/uid.env
-fi
-
 # Functions
 
 function install() {
@@ -90,22 +75,34 @@ function install() {
                 --email $EMAIL -d $DOMAIN --logs-dir /etc/letsencrypt/logs
         fi
     fi
+
+    echo -e -n "${CYAN}(!)${NC} Enter the database name for your Bitwarden instance (ex. vault): "
+    read DATABASE
+    echo ""
+
+    if [ "$DATABASE" == "" ]
+    then
+        DATABASE="vault"
+    fi
     
     pullSetup
     docker run -it --rm --name setup -v $OUTPUT_DIR:/bitwarden \
         --env-file $ENV_DIR/uid.env chunkmonk2/setup:$COREVERSION \
         dotnet Setup.dll -install 1 -domain $DOMAIN -letsencrypt $LETS_ENCRYPT -os $OS \
-        -corev $COREVERSION -webv $WEBVERSION
+        -corev $COREVERSION -webv $WEBVERSION -dbname "$DATABASE"
 }
 
 function dockerComposeUp() {
     dockerComposeFiles
+    dockerComposeVolumes
     docker-compose up -d
 }
 
 function dockerComposeDown() {
     dockerComposeFiles
-    docker-compose down
+    if [ $(docker-compose ps | wc -l) -gt 2 ]; then
+        docker-compose down
+    fi
 }
 
 function dockerComposePull() {
@@ -123,6 +120,32 @@ function dockerComposeFiles() {
     export COMPOSE_HTTP_TIMEOUT="300"
 }
 
+function dockerComposeVolumes() {
+    createDir "core"
+    createDir "core/attachments"
+    createDir "logs"
+    createDir "logs/admin"
+    createDir "logs/api"
+    createDir "logs/events"
+    createDir "logs/icons"
+    createDir "logs/identity"
+    createDir "logs/mssql"
+    createDir "logs/nginx"
+    createDir "logs/notifications"
+    createDir "logs/sso"
+    createDir "logs/portal"
+    createDir "mssql/backups"
+    createDir "mssql/data"
+}
+
+function createDir() {
+    if [ ! -d "${OUTPUT_DIR}/$1" ]
+    then
+        echo "Creating directory $OUTPUT_DIR/$1"
+        mkdir -p $OUTPUT_DIR/$1
+    fi
+}
+
 function dockerPrune() {
     docker image prune --all --force --filter="label=com.bitwarden.product=bitwarden" \
         --filter="label!=com.bitwarden.project=setup"
@@ -138,12 +161,41 @@ function updateLetsEncrypt() {
     fi
 }
 
+function forceUpdateLetsEncrypt() {
+    if [ -d "${OUTPUT_DIR}/letsencrypt/live" ]
+    then
+        docker pull certbot/certbot
+        docker run -i --rm --name certbot -p 443:443 -p 80:80 \
+            -v $OUTPUT_DIR/letsencrypt:/etc/letsencrypt/ certbot/certbot \
+            renew --logs-dir /etc/letsencrypt/logs --force-renew
+    fi
+}
+
 function updateDatabase() {
     pullSetup
-    docker run -i --rm --name setup --network container:bitwarden-mssql \
+    dockerComposeFiles
+    MSSQL_ID=$(docker-compose ps -q mssql)
+    docker run -i --rm --name setup --network container:$MSSQL_ID \
         -v $OUTPUT_DIR:/bitwarden --env-file $ENV_DIR/uid.env chunkmonk2/setup:$COREVERSION \
         dotnet Setup.dll -update 1 -db 1 -os $OS -corev $COREVERSION -webv $WEBVERSION
     echo "Database update complete"
+}
+
+function updatebw() {
+    CORE_ID=$(docker-compose ps -q admin)
+    WEB_ID=$(docker-compose ps -q web)
+    if docker inspect --format='{{.Config.Image}}:' $CORE_ID | grep -F ":$COREVERSION:" | grep -q ":[0-9.]*:$" &&
+       docker inspect --format='{{.Config.Image}}:' $WEB_ID | grep -F ":$WEBVERSION:" | grep -q ":[0-9.]*:$"
+    then
+        echo "Update not needed"
+        exit
+    fi
+    dockerComposeDown
+    update withpull
+    restart
+    dockerPrune
+    echo "Pausing 60 seconds for database to come online. Please wait..."
+    sleep 60
 }
 
 function update() {
@@ -168,7 +220,14 @@ function restart() {
     dockerComposePull
     updateLetsEncrypt
     dockerComposeUp
-    dockerPrune
+    printEnvironment
+}
+
+function certRestart() {
+    dockerComposeDown
+    dockerComposePull
+    forceUpdateLetsEncrypt
+    dockerComposeUp
     printEnvironment
 }
 
@@ -178,31 +237,36 @@ function pullSetup() {
 
 # Commands
 
-if [ "$1" == "install" ]
-then
-    install
-elif [ "$1" == "start" -o "$1" == "restart" ]
-then
-    restart
-elif [ "$1" == "pull" ]
-then
-    dockerComposePull
-elif [ "$1" == "stop" ]
-then
-    dockerComposeDown
-elif [ "$1" == "updatedb" ]
-then
-    updateDatabase
-elif [ "$1" == "update" ]
-then
-    dockerComposeDown
-    update withpull
-    restart
-    echo "Pausing 60 seconds for database to come online. Please wait..."
-    sleep 60
-    updateDatabase
-elif [ "$1" == "rebuild" ]
-then
-    dockerComposeDown
-    update nopull
-fi
+case $1 in
+    "install")
+        install
+        ;;
+    "start" | "restart")
+        restart
+        ;;
+    "pull")
+        dockerComposePull
+        ;;
+    "stop")
+        dockerComposeDown
+        ;;
+    "renewcert")
+        certRestart
+        ;;
+    "updateconf")
+        dockerComposeDown
+        update withpull
+        ;;
+    "updatedb")
+        updateDatabase
+        ;;
+    "update")
+        dockerComposeFiles
+        updatebw
+        updateDatabase
+        ;;
+    "rebuild")
+        dockerComposeDown
+        update nopull
+        ;;
+esac

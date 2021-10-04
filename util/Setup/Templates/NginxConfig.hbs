@@ -43,7 +43,7 @@ server {
 
   # Verify chain of trust of OCSP response using Root CA and Intermediate certs
   ssl_trusted_certificate {{{CaPath}}};
-  resolver 8.8.8.8 8.8.4.4 208.67.222.222 208.67.220.220 valid=300s;
+  resolver 1.1.1.1 1.0.0.1 9.9.9.9 149.112.112.112 valid=300s;
 {{/if}}
 
   include /etc/nginx/security-headers-ssl.conf;
@@ -69,6 +69,11 @@ server {
     add_header X-Robots-Tag "noindex, nofollow";
   }
 
+  location /alive {
+    return 200 'alive';
+    add_header Content-Type text/plain;
+  }
+
   location = /app-id.json {
     proxy_pass http://web:5000/app-id.json;
 {{#if Ssl}}
@@ -87,16 +92,34 @@ server {
     proxy_pass http://web:5000/u2f-connector.html;
   }
 
+  location = /webauthn-connector.html {
+    proxy_pass http://web:5000/webauthn-connector.html;
+  }
+
+  location = /webauthn-fallback-connector.html {
+    proxy_pass http://web:5000/webauthn-fallback-connector.html;
+  }
+
+  location = /sso-connector.html {
+    proxy_pass http://web:5000/sso-connector.html;
+  }
+
+{{#if Captcha}}
+  location = /captcha-connector.html {
+    proxy_pass http://web:5000/captcha-connector.html;
+  }
+  
+  location = /captcha-mobile-connector.html {
+    proxy_pass http://web:5000/captcha-mobile-connector.html;
+  }
+{{/if}}
+
   location /attachments/ {
     proxy_pass http://attachments:5000/;
   }
 
   location /api/ {
     proxy_pass http://api:5000/;
-  }
-
-  location /identity/ {
-    proxy_pass http://identity:5000/;
   }
 
   location /icons/ {
@@ -113,8 +136,39 @@ server {
     proxy_set_header Connection $http_connection;
   }
 
+  location /events/ {
+    proxy_pass http://events:5000/;
+  }
+
+  location /sso {
+    proxy_pass http://sso:5000;
+{{#if Ssl}}
+    include /etc/nginx/security-headers-ssl.conf;
+{{/if}}
+    include /etc/nginx/security-headers.conf;
+    add_header X-Frame-Options SAMEORIGIN;
+  }
+
+  location /identity {
+    proxy_pass http://identity:5000;
+{{#if Ssl}}
+    include /etc/nginx/security-headers-ssl.conf;
+{{/if}}
+    include /etc/nginx/security-headers.conf;
+    add_header X-Frame-Options SAMEORIGIN;
+  }
+
   location /admin {
     proxy_pass http://admin:5000;
+{{#if Ssl}}
+    include /etc/nginx/security-headers-ssl.conf;
+{{/if}}
+    include /etc/nginx/security-headers.conf;
+    add_header X-Frame-Options SAMEORIGIN;
+  }
+
+  location /portal {
+    proxy_pass http://portal:5000;
 {{#if Ssl}}
     include /etc/nginx/security-headers-ssl.conf;
 {{/if}}

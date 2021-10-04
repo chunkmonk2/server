@@ -1,5 +1,5 @@
 ﻿CREATE PROCEDURE [dbo].[Cipher_Create]
-    @Id UNIQUEIDENTIFIER,
+    @Id UNIQUEIDENTIFIER OUTPUT,
     @UserId UNIQUEIDENTIFIER,
     @OrganizationId UNIQUEIDENTIFIER,
     @Type TINYINT,
@@ -8,7 +8,9 @@
     @Folders NVARCHAR(MAX),
     @Attachments NVARCHAR(MAX),
     @CreationDate DATETIME2(7),
-    @RevisionDate DATETIME2(7)
+    @RevisionDate DATETIME2(7),
+    @DeletedDate DATETIME2(7),
+    @Reprompt TINYINT
 AS
 BEGIN
     SET NOCOUNT ON
@@ -24,7 +26,9 @@ BEGIN
         [Folders],
         [Attachments],
         [CreationDate],
-        [RevisionDate]
+        [RevisionDate],
+        [DeletedDate],
+        [Reprompt]
     )
     VALUES
     (
@@ -37,7 +41,9 @@ BEGIN
         @Folders,
         @Attachments,
         @CreationDate,
-        @RevisionDate
+        @RevisionDate,
+        @DeletedDate,
+        @Reprompt
     )
 
     IF @OrganizationId IS NOT NULL

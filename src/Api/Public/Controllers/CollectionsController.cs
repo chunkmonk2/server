@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Bit.Core;
+using Bit.Core.Context;
 using Bit.Core.Models.Api.Public;
 using Bit.Core.Repositories;
 using Bit.Core.Services;
@@ -17,12 +17,12 @@ namespace Bit.Api.Public.Controllers
     {
         private readonly ICollectionRepository _collectionRepository;
         private readonly ICollectionService _collectionService;
-        private readonly CurrentContext _currentContext;
+        private readonly ICurrentContext _currentContext;
 
         public CollectionsController(
             ICollectionRepository collectionRepository,
             ICollectionService collectionService,
-            CurrentContext currentContext)
+            ICurrentContext currentContext)
         {
             _collectionRepository = collectionRepository;
             _collectionService = collectionService;
@@ -44,7 +44,7 @@ namespace Bit.Api.Public.Controllers
         {
             var collectionWithGroups = await _collectionRepository.GetByIdWithGroupsAsync(id);
             var collection = collectionWithGroups?.Item1;
-            if(collection == null || collection.OrganizationId != _currentContext.OrganizationId)
+            if (collection == null || collection.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -87,7 +87,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> Put(Guid id, [FromBody]CollectionUpdateRequestModel model)
         {
             var existingCollection = await _collectionRepository.GetByIdAsync(id);
-            if(existingCollection == null || existingCollection.OrganizationId != _currentContext.OrganizationId)
+            if (existingCollection == null || existingCollection.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }
@@ -111,7 +111,7 @@ namespace Bit.Api.Public.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             var collection = await _collectionRepository.GetByIdAsync(id);
-            if(collection == null || collection.OrganizationId != _currentContext.OrganizationId)
+            if (collection == null || collection.OrganizationId != _currentContext.OrganizationId)
             {
                 return new NotFoundResult();
             }

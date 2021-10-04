@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Bit.Core.Models.Data;
 using Bit.Core.Models.Table;
 using Bit.Core.Utilities;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Repositories.TableStorage
 {
@@ -44,6 +44,19 @@ namespace Bit.Core.Repositories.TableStorage
                 $"ActingUserId={actingUserId}__Date={{0}}", startDate, endDate, pageOptions);
         }
 
+        public async Task<PagedResult<IEvent>> GetManyByProviderAsync(Guid providerId,
+            DateTime startDate, DateTime endDate, PageOptions pageOptions)
+        {
+            return await GetManyAsync($"ProviderId={providerId}", "Date={0}", startDate, endDate, pageOptions);
+        }
+
+        public async Task<PagedResult<IEvent>> GetManyByProviderActingUserAsync(Guid providerId, Guid actingUserId,
+            DateTime startDate, DateTime endDate, PageOptions pageOptions)
+        {
+            return await GetManyAsync($"ProviderId={providerId}",
+                $"ActingUserId={actingUserId}__Date={{0}}", startDate, endDate, pageOptions);
+        }
+
         public async Task<PagedResult<IEvent>> GetManyByCipherAsync(Cipher cipher, DateTime startDate, DateTime endDate,
             PageOptions pageOptions)
         {
@@ -54,7 +67,7 @@ namespace Bit.Core.Repositories.TableStorage
 
         public async Task CreateAsync(IEvent e)
         {
-            if(!(e is EventTableEntity entity))
+            if (!(e is EventTableEntity entity))
             {
                 throw new ArgumentException(nameof(e));
             }
@@ -62,14 +75,14 @@ namespace Bit.Core.Repositories.TableStorage
             await CreateEntityAsync(entity);
         }
 
-        public async Task CreateManyAsync(IList<IEvent> e)
+        public async Task CreateManyAsync(IEnumerable<IEvent> e)
         {
-            if(!e?.Any() ?? true)
+            if (!e?.Any() ?? true)
             {
                 return;
             }
 
-            if(e.Count == 1)
+            if (!e.Skip(1).Any())
             {
                 await CreateAsync(e.First());
                 return;
@@ -77,10 +90,10 @@ namespace Bit.Core.Repositories.TableStorage
 
             var entities = e.Where(ev => ev is EventTableEntity).Select(ev => ev as EventTableEntity);
             var entityGroups = entities.GroupBy(ent => ent.PartitionKey);
-            foreach(var group in entityGroups)
+            foreach (var group in entityGroups)
             {
                 var groupEntities = group.ToList();
-                if(groupEntities.Count == 1)
+                if (groupEntities.Count == 1)
                 {
                     await CreateEntityAsync(groupEntities.First());
                     continue;
@@ -88,16 +101,16 @@ namespace Bit.Core.Repositories.TableStorage
 
                 // A batch insert can only contain 100 entities at a time
                 var iterations = groupEntities.Count / 100;
-                for(var i = 0; i <= iterations; i++)
+                for (var i = 0; i <= iterations; i++)
                 {
                     var batch = new TableBatchOperation();
                     var batchEntities = groupEntities.Skip(i * 100).Take(100);
-                    if(!batchEntities.Any())
+                    if (!batchEntities.Any())
                     {
                         break;
                     }
 
-                    foreach(var entity in batchEntities)
+                    foreach (var entity in batchEntities)
                     {
                         batch.InsertOrReplace(entity);
                     }
@@ -145,7 +158,7 @@ namespace Bit.Core.Repositories.TableStorage
 
         private string SerializeContinuationToken(TableContinuationToken token)
         {
-            if(token == null)
+            if (token == null)
             {
                 return null;
             }
@@ -156,13 +169,13 @@ namespace Bit.Core.Repositories.TableStorage
 
         private TableContinuationToken DeserializeContinuationToken(string token)
         {
-            if(string.IsNullOrWhiteSpace(token))
+            if (string.IsNullOrWhiteSpace(token))
             {
                 return null;
             }
 
             var tokenParts = token.Split(new string[] { "__" }, StringSplitOptions.None);
-            if(tokenParts.Length < 4 || !Enum.TryParse(tokenParts[0], out StorageLocation tLoc))
+            if (tokenParts.Length < 4 || !Enum.TryParse(tokenParts[0], out StorageLocation tLoc))
             {
                 return null;
             }

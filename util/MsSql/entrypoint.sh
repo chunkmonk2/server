@@ -40,11 +40,15 @@ then
     export SA_PASSWORD=$(cat $SA_PASSWORD_FILE)
 fi
 
+# Replace database name in backup-db.sql
+if [ ! -z "$DATABASE" ]
+then
+  sed -i -e "/@DatabaseName /s/vault/$DATABASE/" backup-db.sql
+  sed -i -e "/@DatabaseNameSafe /s/vault/${DATABASE// /-}/" backup-db.sql
+fi
+
 # The rest...
 
-# ref: https://stackoverflow.com/a/38850273
-touch /var/log/cron.log /etc/crontab /etc/cron.*/*
-chown $USERNAME:$GROUPNAME /var/log/cron.log
 mkdir -p /etc/bitwarden/mssql/backups
 chown -R $USERNAME:$GROUPNAME /etc/bitwarden
 mkdir -p /var/opt/mssql/data
@@ -52,8 +56,10 @@ chown -R $USERNAME:$GROUPNAME /var/opt/mssql
 chown $USERNAME:$GROUPNAME /backup-db.sh
 chown $USERNAME:$GROUPNAME /backup-db.sql
 
-# Sounds like gosu keeps env when switching, but of course cron does not
-env > /etc/environment
-cron
+# Launch a loop to backup database on a daily basis
+if [ "$BACKUP_DB" != "0" ]
+then
+    gosu $USERNAME:$GROUPNAME /bin/sh -c "/backup-db.sh loop >/dev/null 2>&1 &"
+fi
 
 exec gosu $USERNAME:$GROUPNAME /opt/mssql/bin/sqlservr

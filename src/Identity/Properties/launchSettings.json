@@ -17,8 +17,8 @@
     },
     "Identity": {
       "commandName": "Project",
-      "launchBrowser": true,
-      "applicationUrl": "http://localhost:33657",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:33656",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

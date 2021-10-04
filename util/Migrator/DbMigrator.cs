@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data;
 using System.Data.SqlClient;
 using System.Reflection;
 using System.Threading;
@@ -27,27 +28,35 @@ namespace Bit.Migrator
         public bool MigrateMsSqlDatabase(bool enableLogging = true,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            if(enableLogging && _logger != null)
+            if (enableLogging && _logger != null)
             {
                 _logger.LogInformation(Constants.BypassFiltersEventId, "Migrating database.");
             }
 
-            using(var connection = new SqlConnection(_masterConnectionString))
+            using (var connection = new SqlConnection(_masterConnectionString))
             {
+                var databaseName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
+                if (string.IsNullOrWhiteSpace(databaseName))
+                {
+                    databaseName = "vault";
+                }
+
+                var databaseNameQuoted = new SqlCommandBuilder().QuoteIdentifier(databaseName);
                 var command = new SqlCommand(
-                    "IF ((SELECT COUNT(1) FROM sys.databases WHERE [name] = 'vault') = 0) " +
-                    "CREATE DATABASE [vault];", connection);
+                    "IF ((SELECT COUNT(1) FROM sys.databases WHERE [name] = @DatabaseName) = 0) " +
+                    "CREATE DATABASE " + databaseNameQuoted + ";", connection);
+                command.Parameters.Add("@DatabaseName", SqlDbType.VarChar).Value = databaseName;
                 command.Connection.Open();
                 command.ExecuteNonQuery();
 
                 command.CommandText = "IF ((SELECT DATABASEPROPERTYEX([name], 'IsAutoClose') " +
-                    "FROM sys.databases WHERE [name] = 'vault') = 1) " +
-                    "ALTER DATABASE [vault] SET AUTO_CLOSE OFF;";
+                    "FROM sys.databases WHERE [name] = @DatabaseName) = 1) " +
+                    "ALTER DATABASE " + databaseNameQuoted + " SET AUTO_CLOSE OFF;";
                 command.ExecuteNonQuery();
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            using(var connection = new SqlConnection(_connectionString))
+            using (var connection = new SqlConnection(_connectionString))
             {
                 // Rename old migration scripts to new namespace.
                 var command = new SqlCommand(
@@ -67,9 +76,9 @@ namespace Bit.Migrator
                 .WithTransaction()
                 .WithExecutionTimeout(new TimeSpan(0, 5, 0));
 
-            if(enableLogging)
+            if (enableLogging)
             {
-                if(_logger != null)
+                if (_logger != null)
                 {
                     builder.LogTo(new DbUpLogger(_logger));
                 }
@@ -82,9 +91,9 @@ namespace Bit.Migrator
             var upgrader = builder.Build();
             var result = upgrader.PerformUpgrade();
 
-            if(enableLogging && _logger != null)
+            if (enableLogging && _logger != null)
             {
-                if(result.Successful)
+                if (result.Successful)
                 {
                     _logger.LogInformation(Constants.BypassFiltersEventId, "Migration successful.");
                 }

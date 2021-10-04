@@ -3,25 +3,33 @@ using Bit.Core.Enums;
 using Bit.Core.Utilities;
 using System.Collections.Generic;
 using Newtonsoft.Json;
-using Bit.Core.Services;
-using Bit.Core.Exceptions;
 using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 
 namespace Bit.Core.Models.Table
 {
-    public class User : ITableObject<Guid>, ISubscriber, IStorable, IStorableSubscriber, IRevisable, ITwoFactorProvidersUser
+    public class User : ITableObject<Guid>, ISubscriber, IStorable, IStorableSubscriber, IRevisable, ITwoFactorProvidersUser, IReferenceable
     {
         private Dictionary<TwoFactorProviderType, TwoFactorProvider> _twoFactorProviders;
 
         public Guid Id { get; set; }
+        [MaxLength(50)]
         public string Name { get; set; }
+        [Required]
+        [MaxLength(256)]
         public string Email { get; set; }
         public bool EmailVerified { get; set; }
+        [MaxLength(300)]
         public string MasterPassword { get; set; }
+        [MaxLength(50)]
         public string MasterPasswordHint { get; set; }
+        [MaxLength(10)]
         public string Culture { get; set; } = "en-US";
+        [Required]
+        [MaxLength(50)]
         public string SecurityStamp { get; set; }
         public string TwoFactorProviders { get; set; }
+        [MaxLength(32)]
         public string TwoFactorRecoveryCode { get; set; }
         public string EquivalentDomains { get; set; }
         public string ExcludedGlobalEquivalentDomains { get; set; }
@@ -35,13 +43,21 @@ namespace Bit.Core.Models.Table
         public long? Storage { get; set; }
         public short? MaxStorageGb { get; set; }
         public GatewayType? Gateway { get; set; }
+        [MaxLength(50)]
         public string GatewayCustomerId { get; set; }
+        [MaxLength(50)]
         public string GatewaySubscriptionId { get; set; }
+        public string ReferenceData { get; set; }
+        [MaxLength(100)]
         public string LicenseKey { get; set; }
+        [Required]
+        [MaxLength(30)]
+        public string ApiKey { get; set; }
         public KdfType Kdf { get; set; } = KdfType.PBKDF2_SHA256;
         public int KdfIterations { get; set; } = 5000;
         public DateTime CreationDate { get; internal set; } = DateTime.UtcNow;
         public DateTime RevisionDate { get; internal set; } = DateTime.UtcNow;
+        public bool ForcePasswordReset { get; set; }
 
         public void SetNewId()
         {
@@ -73,16 +89,21 @@ namespace Bit.Core.Models.Table
             return "userId";
         }
 
+        public bool IsUser()
+        {
+            return true;
+        }
+
         public Dictionary<TwoFactorProviderType, TwoFactorProvider> GetTwoFactorProviders()
         {
-            if(string.IsNullOrWhiteSpace(TwoFactorProviders))
+            if (string.IsNullOrWhiteSpace(TwoFactorProviders))
             {
                 return null;
             }
 
             try
             {
-                if(_twoFactorProviders == null)
+                if (_twoFactorProviders == null)
                 {
                     _twoFactorProviders =
                         JsonConvert.DeserializeObject<Dictionary<TwoFactorProviderType, TwoFactorProvider>>(
@@ -91,7 +112,7 @@ namespace Bit.Core.Models.Table
 
                 return _twoFactorProviders;
             }
-            catch(JsonSerializationException)
+            catch (JsonSerializationException)
             {
                 return null;
             }
@@ -119,7 +140,7 @@ namespace Bit.Core.Models.Table
         public TwoFactorProvider GetTwoFactorProvider(TwoFactorProviderType provider)
         {
             var providers = GetTwoFactorProviders();
-            if(providers == null || !providers.ContainsKey(provider))
+            if (providers == null || !providers.ContainsKey(provider))
             {
                 return null;
             }
@@ -129,7 +150,7 @@ namespace Bit.Core.Models.Table
 
         public long StorageBytesRemaining()
         {
-            if(!MaxStorageGb.HasValue)
+            if (!MaxStorageGb.HasValue)
             {
                 return 0;
             }
@@ -140,7 +161,7 @@ namespace Bit.Core.Models.Table
         public long StorageBytesRemaining(short maxStorageGb)
         {
             var maxStorageBytes = maxStorageGb * 1073741824L;
-            if(!Storage.HasValue)
+            if (!Storage.HasValue)
             {
                 return maxStorageBytes;
             }

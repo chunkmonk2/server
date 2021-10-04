@@ -4,50 +4,74 @@ using Bit.Core.Enums;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Linq;
+using System.ComponentModel.DataAnnotations;
 
 namespace Bit.Core.Models.Table
 {
-    public class Organization : ITableObject<Guid>, ISubscriber, IStorable, IStorableSubscriber, IRevisable
+    public class Organization : ITableObject<Guid>, ISubscriber, IStorable, IStorableSubscriber, IRevisable, IReferenceable
     {
         private Dictionary<TwoFactorProviderType, TwoFactorProvider> _twoFactorProviders;
 
         public Guid Id { get; set; }
+        [MaxLength(50)]
+        public string Identifier { get; set; }
+        [MaxLength(50)]
         public string Name { get; set; }
+        [MaxLength(50)]
         public string BusinessName { get; set; }
+        [MaxLength(50)]
         public string BusinessAddress1 { get; set; }
+        [MaxLength(50)]
         public string BusinessAddress2 { get; set; }
+        [MaxLength(50)]
         public string BusinessAddress3 { get; set; }
+        [MaxLength(2)]
         public string BusinessCountry { get; set; }
+        [MaxLength(30)]
         public string BusinessTaxNumber { get; set; }
+        [MaxLength(256)]
         public string BillingEmail { get; set; }
+        [MaxLength(50)]
         public string Plan { get; set; }
         public PlanType PlanType { get; set; }
-        public short? Seats { get; set; }
+        public int? Seats { get; set; }
         public short? MaxCollections { get; set; }
+        public bool UsePolicies { get; set; }
+        public bool UseSso { get; set; }
         public bool UseGroups { get; set; }
         public bool UseDirectory { get; set; }
         public bool UseEvents { get; set; }
         public bool UseTotp { get; set; }
         public bool Use2fa { get; set; }
         public bool UseApi { get; set; }
+        public bool UseResetPassword { get; set; }
         public bool SelfHost { get; set; }
         public bool UsersGetPremium { get; set; }
         public long? Storage { get; set; }
         public short? MaxStorageGb { get; set; }
         public GatewayType? Gateway { get; set; }
+        [MaxLength(50)]
         public string GatewayCustomerId { get; set; }
+        [MaxLength(50)]
         public string GatewaySubscriptionId { get; set; }
+        public string ReferenceData { get; set; }
         public bool Enabled { get; set; } = true;
+        [MaxLength(100)]
         public string LicenseKey { get; set; }
+        [MaxLength(30)]
         public string ApiKey { get; set; }
+        public string PublicKey { get; set; }
+        public string PrivateKey { get; set; }
         public string TwoFactorProviders { get; set; }
         public DateTime? ExpirationDate { get; set; }
         public DateTime CreationDate { get; internal set; } = DateTime.UtcNow;
         public DateTime RevisionDate { get; internal set; } = DateTime.UtcNow;
+        public int? MaxAutoscaleSeats { get; set; } = null;
+        public DateTime? OwnersNotifiedOfAutoscaling { get; set; } = null;
 
         public void SetNewId()
         {
-            if(Id == default(Guid))
+            if (Id == default(Guid))
             {
                 Id = CoreHelpers.GenerateComb();
             }
@@ -78,9 +102,14 @@ namespace Bit.Core.Models.Table
             return "organizationId";
         }
 
+        public bool IsUser()
+        {
+            return false;
+        }
+
         public long StorageBytesRemaining()
         {
-            if(!MaxStorageGb.HasValue)
+            if (!MaxStorageGb.HasValue)
             {
                 return 0;
             }
@@ -91,7 +120,7 @@ namespace Bit.Core.Models.Table
         public long StorageBytesRemaining(short maxStorageGb)
         {
             var maxStorageBytes = maxStorageGb * 1073741824L;
-            if(!Storage.HasValue)
+            if (!Storage.HasValue)
             {
                 return maxStorageBytes;
             }
@@ -101,14 +130,14 @@ namespace Bit.Core.Models.Table
 
         public Dictionary<TwoFactorProviderType, TwoFactorProvider> GetTwoFactorProviders()
         {
-            if(string.IsNullOrWhiteSpace(TwoFactorProviders))
+            if (string.IsNullOrWhiteSpace(TwoFactorProviders))
             {
                 return null;
             }
 
             try
             {
-                if(_twoFactorProviders == null)
+                if (_twoFactorProviders == null)
                 {
                     _twoFactorProviders =
                         JsonConvert.DeserializeObject<Dictionary<TwoFactorProviderType, TwoFactorProvider>>(
@@ -117,7 +146,7 @@ namespace Bit.Core.Models.Table
 
                 return _twoFactorProviders;
             }
-            catch(JsonSerializationException)
+            catch (JsonSerializationException)
             {
                 return null;
             }
@@ -125,7 +154,7 @@ namespace Bit.Core.Models.Table
 
         public void SetTwoFactorProviders(Dictionary<TwoFactorProviderType, TwoFactorProvider> providers)
         {
-            if(!providers.Any())
+            if (!providers.Any())
             {
                 TwoFactorProviders = null;
                 _twoFactorProviders = null;
@@ -142,7 +171,7 @@ namespace Bit.Core.Models.Table
         public bool TwoFactorProviderIsEnabled(TwoFactorProviderType provider)
         {
             var providers = GetTwoFactorProviders();
-            if(providers == null || !providers.ContainsKey(provider))
+            if (providers == null || !providers.ContainsKey(provider))
             {
                 return false;
             }
@@ -153,7 +182,7 @@ namespace Bit.Core.Models.Table
         public bool TwoFactorIsEnabled()
         {
             var providers = GetTwoFactorProviders();
-            if(providers == null)
+            if (providers == null)
             {
                 return false;
             }
@@ -164,7 +193,7 @@ namespace Bit.Core.Models.Table
         public TwoFactorProvider GetTwoFactorProvider(TwoFactorProviderType provider)
         {
             var providers = GetTwoFactorProviders();
-            if(providers == null || !providers.ContainsKey(provider))
+            if (providers == null || !providers.ContainsKey(provider))
             {
                 return null;
             }

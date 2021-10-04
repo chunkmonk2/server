@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using Bit.Core;
 using Bit.Core.Enums;
 using Bit.Core.Models.Business;
 using Bit.Core.Models.Data;
 using Bit.Core.Models.Table;
 using Bit.Core.Utilities;
+using Bit.Core.Settings;
 
 namespace Bit.Admin.Models
 {
@@ -15,8 +15,9 @@ namespace Bit.Admin.Models
         public OrganizationEditModel() { }
 
         public OrganizationEditModel(Organization org, IEnumerable<OrganizationUserUserDetails> orgUsers,
-            BillingInfo billingInfo, GlobalSettings globalSettings)
-            : base(org, orgUsers)
+            IEnumerable<Cipher> ciphers, IEnumerable<Collection> collections, IEnumerable<Group> groups,
+            IEnumerable<Policy> policies, BillingInfo billingInfo, GlobalSettings globalSettings)
+            : base(org, orgUsers, ciphers, collections, groups, policies)
         {
             BillingInfo = billingInfo;
             BraintreeMerchantId = globalSettings.Braintree.MerchantId;
@@ -27,13 +28,17 @@ namespace Bit.Admin.Models
             PlanType = org.PlanType;
             Plan = org.Plan;
             Seats = org.Seats;
+            MaxAutoscaleSeats = org.MaxAutoscaleSeats;
             MaxCollections = org.MaxCollections;
+            UsePolicies = org.UsePolicies;
+            UseSso = org.UseSso;
             UseGroups = org.UseGroups;
             UseDirectory = org.UseDirectory;
             UseEvents = org.UseEvents;
             UseTotp = org.UseTotp;
             Use2fa = org.Use2fa;
             UseApi = org.UseApi;
+            UseResetPassword = org.UseResetPassword;
             SelfHost = org.SelfHost;
             UsersGetPremium = org.UsersGetPremium;
             MaxStorageGb = org.MaxStorageGb;
@@ -64,9 +69,15 @@ namespace Bit.Admin.Models
         [Display(Name = "Plan Name")]
         public string Plan { get; set; }
         [Display(Name = "Seats")]
-        public short? Seats { get; set; }
+        public int? Seats { get; set; }
+        [Display(Name = "Max. Autoscale Seats")]
+        public int? MaxAutoscaleSeats { get; set; }
         [Display(Name = "Max. Collections")]
         public short? MaxCollections { get; set; }
+        [Display(Name = "Policies")]
+        public bool UsePolicies { get; set; }
+        [Display(Name = "SSO")]
+        public bool UseSso { get; set; }
         [Display(Name = "Groups")]
         public bool UseGroups { get; set; }
         [Display(Name = "Directory")]
@@ -79,6 +90,8 @@ namespace Bit.Admin.Models
         public bool Use2fa { get; set; }
         [Display(Name = "API")]
         public bool UseApi{ get; set; }
+        [Display(Name = "Reset Password")]
+        public bool UseResetPassword { get; set; }
         [Display(Name = "Self Host")]
         public bool SelfHost { get; set; }
         [Display(Name = "Users Get Premium")]
@@ -97,6 +110,7 @@ namespace Bit.Admin.Models
         public string LicenseKey { get; set; }
         [Display(Name = "Expiration Date")]
         public DateTime? ExpirationDate { get; set; }
+        public bool SalesAssistedTrialStarted { get; set; }
 
         public Organization ToOrganization(Organization existingOrganization)
         {
@@ -107,12 +121,15 @@ namespace Bit.Admin.Models
             existingOrganization.Plan = Plan;
             existingOrganization.Seats = Seats;
             existingOrganization.MaxCollections = MaxCollections;
+            existingOrganization.UsePolicies = UsePolicies;
+            existingOrganization.UseSso = UseSso;
             existingOrganization.UseGroups = UseGroups;
             existingOrganization.UseDirectory = UseDirectory;
             existingOrganization.UseEvents = UseEvents;
             existingOrganization.UseTotp = UseTotp;
             existingOrganization.Use2fa = Use2fa;
             existingOrganization.UseApi = UseApi;
+            existingOrganization.UseResetPassword = UseResetPassword;
             existingOrganization.SelfHost = SelfHost;
             existingOrganization.UsersGetPremium = UsersGetPremium;
             existingOrganization.MaxStorageGb = MaxStorageGb;
@@ -122,6 +139,7 @@ namespace Bit.Admin.Models
             existingOrganization.Enabled = Enabled;
             existingOrganization.LicenseKey = LicenseKey;
             existingOrganization.ExpirationDate = ExpirationDate;
+            existingOrganization.MaxAutoscaleSeats = MaxAutoscaleSeats;
             return existingOrganization;
         }
     }

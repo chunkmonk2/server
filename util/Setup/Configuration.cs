@@ -37,6 +37,9 @@ namespace Bit.Setup
             "Learn more: https://docs.docker.com/compose/compose-file/compose-versioning/")]
         public string ComposeVersion { get; set; }
 
+        [Description("Configure Nginx for Captcha.")]
+        public bool Captcha { get; set; } = false;
+
         [Description("Configure Nginx for SSL.")]
         public bool Ssl { get; set; } = true;
 
@@ -72,6 +75,16 @@ namespace Bit.Setup
             "`/etc/ssl` within the container.")]
         public string SslDiffieHellmanPath { get; set; }
 
+        [Description("Nginx Header Content-Security-Policy parameter\n" +
+            "WARNING: Reconfiguring this parameter may break features. By changing this parameter\n" +
+            "you become responsible for maintaining this value.")]
+        public string NginxHeaderContentSecurityPolicy { get; set; } = "default-src 'self'; style-src 'self' " +
+            "'unsafe-inline'; img-src 'self' data: https://haveibeenpwned.com https://www.gravatar.com; " +
+            "child-src 'self' https://*.duosecurity.com https://*.duofederal.com; " +
+            "frame-src 'self' https://*.duosecurity.com https://*.duofederal.com; " +
+            "connect-src 'self' wss://{0} https://api.pwnedpasswords.com " +
+            "https://2fa.directory; object-src 'self' blob:;";
+
         [Description("Communicate with the Bitwarden push relay service (push.bitwarden.com) for mobile\n" +
             "app live sync.")]
         public bool PushNotifications { get; set; } = true;
@@ -92,7 +105,7 @@ namespace Bit.Setup
         {
             get
             {
-                if(Uri.TryCreate(Url, UriKind.Absolute, out var uri))
+                if (Uri.TryCreate(Url, UriKind.Absolute, out var uri))
                 {
                     return uri.Host;
                 }

@@ -1,30 +1,35 @@
 ﻿using System;
-using Bit.Core;
+using System.Globalization;
+using Bit.Core.Context;
 using Bit.Core.Identity;
+using Bit.Core.Settings;
 using Bit.Core.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Serilog.Events;
+using Microsoft.Extensions.Hosting;
 using Stripe;
+
+#if !OSS
+using Bit.CommCore.Utilities;
+#endif
 
 namespace Bit.Admin
 {
     public class Startup
     {
-        public Startup(IHostingEnvironment env, IConfiguration configuration)
+        public Startup(IWebHostEnvironment env, IConfiguration configuration)
         {
+            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
             Configuration = configuration;
             Environment = env;
         }
 
         public IConfiguration Configuration { get; private set; }
-        public IHostingEnvironment Environment { get; set; }
+        public IWebHostEnvironment Environment { get; set; }
 
         public void ConfigureServices(IServiceCollection services)
         {
@@ -39,13 +44,13 @@ namespace Bit.Admin
             services.AddCustomDataProtectionServices(Environment, globalSettings);
 
             // Stripe Billing
-            StripeConfiguration.SetApiKey(globalSettings.StripeApiKey);
+            StripeConfiguration.ApiKey = globalSettings.StripeApiKey;
 
             // Repositories
             services.AddSqlServerRepositories(globalSettings);
 
             // Context
-            services.AddScoped<CurrentContext>();
+            services.AddScoped<ICurrentContext, CurrentContext>();
 
             // Identity
             services.AddPasswordlessIdentityServices<ReadOnlyEnvIdentityUserStore>(globalSettings);
@@ -53,7 +58,7 @@ namespace Bit.Admin
             {
                 options.ValidationInterval = TimeSpan.FromMinutes(5);
             });
-            if(globalSettings.SelfHosted)
+            if (globalSettings.SelfHosted)
             {
                 services.ConfigureApplicationCookie(options =>
                 {
@@ -64,6 +69,12 @@ namespace Bit.Admin
             // Services
             services.AddBaseServices();
             services.AddDefaultServices(globalSettings);
+            
+            #if OSS
+                services.AddOosServices();
+            #else
+                services.AddCommCoreServices();
+            #endif
 
             // Mvc
             services.AddMvc(config =>
@@ -73,48 +84,57 @@ namespace Bit.Admin
             services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
 
             // Jobs service
-            Jobs.JobsHostedService.AddJobsServices(services);
+            Jobs.JobsHostedService.AddJobsServices(services, globalSettings.SelfHosted);
             services.AddHostedService<Jobs.JobsHostedService>();
-            if(globalSettings.SelfHosted)
+            if (globalSettings.SelfHosted)
             {
                 services.AddHostedService<HostedServices.DatabaseMigrationHostedService>();
             }
             else
             {
-                if(CoreHelpers.SettingHasValue(globalSettings.Storage.ConnectionString))
+                if (CoreHelpers.SettingHasValue(globalSettings.Storage.ConnectionString))
                 {
                     services.AddHostedService<HostedServices.AzureQueueBlockIpHostedService>();
                 }
-                else if(CoreHelpers.SettingHasValue(globalSettings.Amazon?.AccessKeySecret))
+                else if (CoreHelpers.SettingHasValue(globalSettings.Amazon?.AccessKeySecret))
                 {
                     services.AddHostedService<HostedServices.AmazonSqsBlockIpHostedService>();
+                }
+                if (CoreHelpers.SettingHasValue(globalSettings.Mail.ConnectionString))
+                {
+                    services.AddHostedService<HostedServices.AzureQueueMailHostedService>();
                 }
             }
         }
 
         public void Configure(
             IApplicationBuilder app,
-            IHostingEnvironment env,
-            IApplicationLifetime appLifetime,
-            GlobalSettings globalSettings,
-            ILoggerFactory loggerFactory)
+            IWebHostEnvironment env,
+            IHostApplicationLifetime appLifetime,
+            GlobalSettings globalSettings)
         {
-            loggerFactory.AddSerilog(app, env, appLifetime, globalSettings, (e) => e.Level >= LogEventLevel.Error);
+            app.UseSerilog(env, appLifetime, globalSettings);
 
-            if(globalSettings.SelfHosted)
+            if (globalSettings.SelfHosted)
             {
                 app.UsePathBase("/admin");
                 app.UseForwardedHeaders(globalSettings);
             }
 
-            if(env.IsDevelopment())
+            if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
+            else
+            {
+                app.UseExceptionHandler("/error");
+            }
 
-            app.UseAuthentication();
             app.UseStaticFiles();
-            app.UseMvcWithDefaultRoute();
+            app.UseRouting();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseEndpoints(endpoints => endpoints.MapDefaultControllerRoute());
         }
     }
 }

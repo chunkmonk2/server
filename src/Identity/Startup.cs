@@ -2,25 +2,34 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Bit.Core;
+using Bit.Core.Context;
+using Bit.Core.Settings;
 using Bit.Core.Utilities;
-using Serilog.Events;
 using AspNetCoreRateLimit;
+using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Logging;
+using System.IdentityModel.Tokens.Jwt;
+using System.Threading.Tasks;
+using Bit.Identity.Utilities;
+using IdentityServer4.Extensions;
 
 namespace Bit.Identity
 {
     public class Startup
     {
-        public Startup(IHostingEnvironment env, IConfiguration configuration)
+        public Startup(IWebHostEnvironment env, IConfiguration configuration)
         {
+            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
             Configuration = configuration;
             Environment = env;
         }
 
         public IConfiguration Configuration { get; private set; }
-        public IHostingEnvironment Environment { get; set; }
+        public IWebHostEnvironment Environment { get; set; }
 
         public void ConfigureServices(IServiceCollection services)
         {
@@ -29,7 +38,7 @@ namespace Bit.Identity
 
             // Settings
             var globalSettings = services.AddGlobalSettingsServices(Configuration);
-            if(!globalSettings.SelfHosted)
+            if (!globalSettings.SelfHosted)
             {
                 services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimitOptions"));
                 services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
@@ -42,17 +51,69 @@ namespace Bit.Identity
             services.AddSqlServerRepositories(globalSettings);
 
             // Context
-            services.AddScoped<CurrentContext>();
+            services.AddScoped<ICurrentContext, CurrentContext>();
 
             // Caching
             services.AddMemoryCache();
 
-            if(!globalSettings.SelfHosted)
+            // Mvc
+            services.AddMvc();
+
+            if (!globalSettings.SelfHosted)
             {
                 // Rate limiting
                 services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
                 services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
             }
+
+            // Cookies
+            if (Environment.IsDevelopment())
+            {
+                services.Configure<CookiePolicyOptions>(options =>
+                {
+                    options.MinimumSameSitePolicy = Microsoft.AspNetCore.Http.SameSiteMode.Unspecified;
+                    options.OnAppendCookie = ctx =>
+                    {
+                        ctx.CookieOptions.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Unspecified;
+                    };
+                });
+            }
+
+            JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
+
+            // Authentication
+            services
+                .AddDistributedIdentityServices(globalSettings)
+                .AddAuthentication()
+                .AddCookie(AuthenticationSchemes.BitwardenExternalCookieAuthenticationScheme)
+                .AddOpenIdConnect("sso", "Single Sign On", options =>
+                {
+                    options.Authority = globalSettings.BaseServiceUri.InternalSso;
+                    options.RequireHttpsMetadata = !Environment.IsDevelopment() &&
+                        globalSettings.BaseServiceUri.InternalIdentity.StartsWith("https");
+                    options.ClientId = "oidc-identity";
+                    options.ClientSecret = globalSettings.OidcIdentityClientKey;
+                    options.ResponseMode = "form_post";
+
+                    options.SignInScheme = AuthenticationSchemes.BitwardenExternalCookieAuthenticationScheme;
+                    options.ResponseType = "code";
+                    options.SaveTokens = false;
+                    options.GetClaimsFromUserInfoEndpoint = true;
+
+                    options.Events = new Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectEvents
+                    {
+                        OnRedirectToIdentityProvider = context =>
+                        {
+                            // Pass domain_hint onto the sso idp
+                            context.ProtocolMessage.DomainHint = context.Properties.Items["domain_hint"];
+                            if (context.Properties.Items.ContainsKey("user_identifier"))
+                            {
+                                context.ProtocolMessage.SessionState = context.Properties.Items["user_identifier"];
+                            }
+                            return Task.FromResult(0);
+                        }
+                    };
+                });
 
             // IdentityServer
             services.AddCustomIdentityServerServices(Environment, globalSettings);
@@ -63,56 +124,87 @@ namespace Bit.Identity
             // Services
             services.AddBaseServices();
             services.AddDefaultServices(globalSettings);
+            services.AddCoreLocalizationServices();
 
-            if(CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ConnectionString) &&
+            if (CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ConnectionString) &&
                 CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ApplicationCacheTopicName))
             {
                 services.AddHostedService<Core.HostedServices.ApplicationCacheHostedService>();
             }
+
+            // HttpClients
+            services.AddHttpClient("InternalSso", client =>
+            {
+                client.BaseAddress = new Uri(globalSettings.BaseServiceUri.InternalSso);
+            });
         }
 
         public void Configure(
             IApplicationBuilder app,
-            IHostingEnvironment env,
-            ILoggerFactory loggerFactory,
-            IApplicationLifetime appLifetime,
-            GlobalSettings globalSettings)
+            IWebHostEnvironment env,
+            IHostApplicationLifetime appLifetime,
+            GlobalSettings globalSettings,
+            ILogger<Startup> logger)
         {
-            loggerFactory.AddSerilog(app, env, appLifetime, globalSettings, (e) =>
+            IdentityModelEventSource.ShowPII = true;
+
+            app.UseSerilog(env, appLifetime, globalSettings);
+
+            if (!env.IsDevelopment())
             {
-                var context = e.Properties["SourceContext"].ToString();
-                if(context.Contains(typeof(IpRateLimitMiddleware).FullName) && e.Level == LogEventLevel.Information)
+                var uri = new Uri(globalSettings.BaseServiceUri.Identity);
+                app.Use(async (ctx, next) =>
                 {
-                    return true;
-                }
+                    ctx.SetIdentityServerOrigin($"{uri.Scheme}://{uri.Host}");
+                    await next();
+                });
+            }
 
-                if(context.Contains("IdentityServer4.Validation.TokenValidator") ||
-                    context.Contains("IdentityServer4.Validation.TokenRequestValidator"))
-                {
-                    return e.Level > LogEventLevel.Error;
-                }
-
-                return e.Level >= LogEventLevel.Error;
-            });
+            if (globalSettings.SelfHosted)
+            {
+                app.UsePathBase("/identity");
+                app.UseForwardedHeaders(globalSettings);
+            }
 
             // Default Middleware
-            app.UseDefaultMiddleware(env);
+            app.UseDefaultMiddleware(env, globalSettings);
 
-            if(!globalSettings.SelfHosted)
+            if (!globalSettings.SelfHosted)
             {
                 // Rate limiting
                 app.UseMiddleware<CustomIpRateLimitMiddleware>();
             }
-            else
+
+            if (env.IsDevelopment())
             {
-                app.UseForwardedHeaders(globalSettings);
+                app.UseDeveloperExceptionPage();
+                app.UseCookiePolicy();
             }
+
+            // Add localization
+            app.UseCoreLocalization();
+
+            // Add static files to the request pipeline.
+            app.UseStaticFiles();
+
+            // Add routing
+            app.UseRouting();
+
+            // Add Cors
+            app.UseCors(policy => policy.SetIsOriginAllowed(o => CoreHelpers.IsCorsOriginAllowed(o, globalSettings))
+                .AllowAnyMethod().AllowAnyHeader().AllowCredentials());
 
             // Add current context
             app.UseMiddleware<CurrentContextMiddleware>();
 
             // Add IdentityServer to the request pipeline.
             app.UseIdentityServer();
+
+            // Add Mvc stuff
+            app.UseEndpoints(endpoints => endpoints.MapDefaultControllerRoute());
+
+            // Log startup
+            logger.LogInformation(Constants.BypassFiltersEventId, globalSettings.ProjectName + " started.");
         }
     }
 }

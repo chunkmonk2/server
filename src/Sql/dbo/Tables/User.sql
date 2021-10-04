@@ -1,9 +1,9 @@
 ﻿CREATE TABLE [dbo].[User] (
     [Id]                              UNIQUEIDENTIFIER NOT NULL,
     [Name]                            NVARCHAR (50)    NULL,
-    [Email]                           NVARCHAR (50)    NOT NULL,
+    [Email]                           NVARCHAR (256)   NOT NULL,
     [EmailVerified]                   BIT              NOT NULL,
-    [MasterPassword]                  NVARCHAR (300)   NOT NULL,
+    [MasterPassword]                  NVARCHAR (300)   NULL,
     [MasterPasswordHint]              NVARCHAR (50)    NULL,
     [Culture]                         NVARCHAR (10)    NOT NULL,
     [SecurityStamp]                   NVARCHAR (50)    NOT NULL,
@@ -23,11 +23,14 @@
     [Gateway]                         TINYINT          NULL,
     [GatewayCustomerId]               VARCHAR (50)     NULL,
     [GatewaySubscriptionId]           VARCHAR (50)     NULL,
+    [ReferenceData]                   NVARCHAR (MAX)   NULL,
     [LicenseKey]                      VARCHAR (100)    NULL,
     [Kdf]                             TINYINT          NOT NULL,
     [KdfIterations]                   INT              NOT NULL,
     [CreationDate]                    DATETIME2 (7)    NOT NULL,
     [RevisionDate]                    DATETIME2 (7)    NOT NULL,
+    [ApiKey]                          VARCHAR (30)     NOT NULL,
+    [ForcePasswordReset]              BIT              NOT NULL,
     CONSTRAINT [PK_User] PRIMARY KEY CLUSTERED ([Id] ASC)
 );
 

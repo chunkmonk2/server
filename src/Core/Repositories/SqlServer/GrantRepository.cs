@@ -1,10 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using Bit.Core.Models.Table;
+using Bit.Core.Settings;
 using Dapper;
 
 namespace Bit.Core.Repositories.SqlServer
@@ -21,7 +21,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<Grant> GetByKeyAsync(string key)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Grant>(
                     "[dbo].[Grant_ReadByKey]",
@@ -32,13 +32,14 @@ namespace Bit.Core.Repositories.SqlServer
             }
         }
 
-        public async Task<ICollection<Grant>> GetManyAsync(string subjectId)
+        public async Task<ICollection<Grant>> GetManyAsync(string subjectId, string sessionId,
+            string clientId, string type)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Grant>(
-                    "[dbo].[Grant_ReadBySubjectId]",
-                    new { SubjectId = subjectId },
+                    "[dbo].[Grant_Read]",
+                    new { SubjectId = subjectId, SessionId = sessionId, ClientId = clientId, Type = type },
                     commandType: CommandType.StoredProcedure);
 
                 return results.ToList();
@@ -47,7 +48,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task SaveAsync(Grant obj)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.ExecuteAsync(
                     "[dbo].[Grant_Save]",
@@ -56,9 +57,9 @@ namespace Bit.Core.Repositories.SqlServer
             }
         }
 
-        public async Task DeleteAsync(string key)
+        public async Task DeleteByKeyAsync(string key)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 await connection.ExecuteAsync(
                     "[dbo].[Grant_DeleteByKey]",
@@ -67,24 +68,13 @@ namespace Bit.Core.Repositories.SqlServer
             }
         }
 
-        public async Task DeleteAsync(string subjectId, string clientId)
+        public async Task DeleteManyAsync(string subjectId, string sessionId, string clientId, string type)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 await connection.ExecuteAsync(
-                    "[dbo].[Grant_DeleteBySubjectIdClientId]",
-                    new { SubjectId = subjectId, ClientId = clientId },
-                    commandType: CommandType.StoredProcedure);
-            }
-        }
-
-        public async Task DeleteAsync(string subjectId, string clientId, string type)
-        {
-            using(var connection = new SqlConnection(ConnectionString))
-            {
-                await connection.ExecuteAsync(
-                    "[dbo].[Grant_DeleteBySubjectIdClientIdType]",
-                    new { SubjectId = subjectId, ClientId = clientId, Type = type },
+                    "[dbo].[Grant_Delete]",
+                    new { SubjectId = subjectId, SessionId = sessionId, ClientId = clientId, Type = type },
                     commandType: CommandType.StoredProcedure);
             }
         }

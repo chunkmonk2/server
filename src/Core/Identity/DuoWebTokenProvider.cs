@@ -7,6 +7,7 @@ using Bit.Core.Models;
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Bit.Core.Services;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Identity
 {
@@ -26,13 +27,13 @@ namespace Bit.Core.Identity
         public async Task<bool> CanGenerateTwoFactorTokenAsync(UserManager<User> manager, User user)
         {
             var userService = _serviceProvider.GetRequiredService<IUserService>();
-            if(!(await userService.CanAccessPremium(user)))
+            if (!(await userService.CanAccessPremium(user)))
             {
                 return false;
             }
 
             var provider = user.GetTwoFactorProvider(TwoFactorProviderType.Duo);
-            if(!HasProperMetaData(provider))
+            if (!HasProperMetaData(provider))
             {
                 return false;
             }
@@ -43,13 +44,13 @@ namespace Bit.Core.Identity
         public async Task<string> GenerateAsync(string purpose, UserManager<User> manager, User user)
         {
             var userService = _serviceProvider.GetRequiredService<IUserService>();
-            if(!(await userService.CanAccessPremium(user)))
+            if (!(await userService.CanAccessPremium(user)))
             {
                 return null;
             }
 
             var provider = user.GetTwoFactorProvider(TwoFactorProviderType.Duo);
-            if(!HasProperMetaData(provider))
+            if (!HasProperMetaData(provider))
             {
                 return null;
             }
@@ -62,13 +63,13 @@ namespace Bit.Core.Identity
         public async Task<bool> ValidateAsync(string purpose, string token, UserManager<User> manager, User user)
         {
             var userService = _serviceProvider.GetRequiredService<IUserService>();
-            if(!(await userService.CanAccessPremium(user)))
+            if (!(await userService.CanAccessPremium(user)))
             {
                 return false;
             }
 
             var provider = user.GetTwoFactorProvider(TwoFactorProviderType.Duo);
-            if(!HasProperMetaData(provider))
+            if (!HasProperMetaData(provider))
             {
                 return false;
             }

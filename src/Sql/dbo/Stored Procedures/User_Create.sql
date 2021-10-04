@@ -1,7 +1,7 @@
 ﻿CREATE PROCEDURE [dbo].[User_Create]
-    @Id UNIQUEIDENTIFIER,
+    @Id UNIQUEIDENTIFIER OUTPUT,
     @Name NVARCHAR(50),
-    @Email NVARCHAR(50),
+    @Email NVARCHAR(256),
     @EmailVerified BIT,
     @MasterPassword NVARCHAR(300),
     @MasterPasswordHint NVARCHAR(50),
@@ -23,11 +23,14 @@
     @Gateway TINYINT,
     @GatewayCustomerId VARCHAR(50),
     @GatewaySubscriptionId VARCHAR(50),
+    @ReferenceData VARCHAR(MAX),
     @LicenseKey VARCHAR(100),
     @Kdf TINYINT,
     @KdfIterations INT,
     @CreationDate DATETIME2(7),
-    @RevisionDate DATETIME2(7)
+    @RevisionDate DATETIME2(7),
+    @ApiKey VARCHAR(30),
+    @ForcePasswordReset BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON
@@ -58,11 +61,14 @@ BEGIN
         [Gateway],
         [GatewayCustomerId],
         [GatewaySubscriptionId],
+        [ReferenceData],
         [LicenseKey],
         [Kdf],
         [KdfIterations],
         [CreationDate],
-        [RevisionDate]
+        [RevisionDate],
+        [ApiKey],
+        [ForcePasswordReset]
     )
     VALUES
     (
@@ -90,10 +96,13 @@ BEGIN
         @Gateway,
         @GatewayCustomerId,
         @GatewaySubscriptionId,
+        @ReferenceData,
         @LicenseKey,
         @Kdf,
         @KdfIterations,
         @CreationDate,
-        @RevisionDate
+        @RevisionDate,
+        @ApiKey,
+        @ForcePasswordReset
     )
 END

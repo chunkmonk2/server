@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Net.Http;
 
 namespace Bit.Setup
@@ -13,29 +14,31 @@ namespace Bit.Setup
 
         public static void Main(string[] args)
         {
+            CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+
             _context = new Context
             {
                 Args = args
             };
             ParseParameters();
 
-            if(_context.Parameters.ContainsKey("q"))
+            if (_context.Parameters.ContainsKey("q"))
             {
                 _context.Quiet = _context.Parameters["q"] == "true" || _context.Parameters["q"] == "1";
             }
-            if(_context.Parameters.ContainsKey("os"))
+            if (_context.Parameters.ContainsKey("os"))
             {
                 _context.HostOS = _context.Parameters["os"];
             }
-            if(_context.Parameters.ContainsKey("corev"))
+            if (_context.Parameters.ContainsKey("corev"))
             {
                 _context.CoreVersion = _context.Parameters["corev"];
             }
-            if(_context.Parameters.ContainsKey("webv"))
+            if (_context.Parameters.ContainsKey("webv"))
             {
                 _context.WebVersion = _context.Parameters["webv"];
             }
-            if(_context.Parameters.ContainsKey("stub"))
+            if (_context.Parameters.ContainsKey("stub"))
             {
                 _context.Stub = _context.Parameters["stub"] == "true" ||
                     _context.Parameters["stub"] == "1";
@@ -43,15 +46,15 @@ namespace Bit.Setup
 
             Helpers.WriteLine(_context);
 
-            if(_context.Parameters.ContainsKey("install"))
+            if (_context.Parameters.ContainsKey("install"))
             {
                 Install();
             }
-            else if(_context.Parameters.ContainsKey("update"))
+            else if (_context.Parameters.ContainsKey("update"))
             {
                 Update();
             }
-            else if(_context.Parameters.ContainsKey("printenv"))
+            else if (_context.Parameters.ContainsKey("printenv"))
             {
                 PrintEnvironment();
             }
@@ -63,22 +66,26 @@ namespace Bit.Setup
 
         private static void Install()
         {
-            if(_context.Parameters.ContainsKey("letsencrypt"))
+            if (_context.Parameters.ContainsKey("letsencrypt"))
             {
                 _context.Config.SslManagedLetsEncrypt =
                     _context.Parameters["letsencrypt"].ToLowerInvariant() == "y";
             }
-            if(_context.Parameters.ContainsKey("domain"))
+            if (_context.Parameters.ContainsKey("domain"))
             {
                 _context.Install.Domain = _context.Parameters["domain"].ToLowerInvariant();
             }
+            if (_context.Parameters.ContainsKey("dbname"))
+            {
+                _context.Install.Database = _context.Parameters["dbname"];
+            }
 
-            if(_context.Stub)
+            if (_context.Stub)
             {
                 _context.Install.InstallationId = Guid.Empty;
                 _context.Install.InstallationKey = "SECRET_INSTALLATION_KEY";
             }
-            else if(!ValidateInstallation())
+            else if (!ValidateInstallation())
             {
                 return;
             }
@@ -113,7 +120,7 @@ namespace Bit.Setup
                     "`./bitwarden.sh rebuild` or `./bitwarden.sh update`");
 
             Console.WriteLine("\nNext steps, run:");
-            if(_context.HostOS == "win")
+            if (_context.HostOS == "win")
             {
                 Console.WriteLine("`.\\bitwarden.ps1 -start`");
             }
@@ -126,7 +133,26 @@ namespace Bit.Setup
 
         private static void Update()
         {
-            if(_context.Parameters.ContainsKey("db"))
+            // This portion of code checks for multiple certs in the Identity.pfx PKCS12 bag.  If found, it generates
+            // a new cert and bag to replace the old Identity.pfx.  This fixes an issue that came up as a result of
+            // moving the project to .NET 5.
+            _context.Install.IdentityCertPassword = Helpers.GetValueFromEnvFile("global", "globalSettings__identityServer__certificatePassword");
+            var certCountString = Helpers.Exec("openssl pkcs12 -nokeys -info -in /bitwarden/identity/identity.pfx " + 
+                $"-passin pass:{_context.Install.IdentityCertPassword} 2> /dev/null | grep -c \"\\-----BEGIN CERTIFICATE----\"", true);
+            if (int.TryParse(certCountString, out var certCount) && certCount > 1)
+            {
+                // Extract key from identity.pfx
+                Helpers.Exec("openssl pkcs12 -in /bitwarden/identity/identity.pfx -nocerts -nodes -out identity.key " +
+                    $"-passin pass:{_context.Install.IdentityCertPassword} > /dev/null 2>&1");
+                // Extract certificate from identity.pfx
+                Helpers.Exec("openssl pkcs12 -in /bitwarden/identity/identity.pfx -clcerts -nokeys -out identity.crt " +
+                    $"-passin pass:{_context.Install.IdentityCertPassword} > /dev/null 2>&1");
+                // Create new PKCS12 bag with certificate and key
+                Helpers.Exec("openssl pkcs12 -export -out /bitwarden/identity/identity.pfx -inkey identity.key " +
+                    $"-in identity.crt -passout pass:{_context.Install.IdentityCertPassword} > /dev/null 2>&1");
+            }
+
+            if (_context.Parameters.ContainsKey("db"))
             {
                 MigrateDatabase();
             }
@@ -139,7 +165,7 @@ namespace Bit.Setup
         private static void PrintEnvironment()
         {
             _context.LoadConfiguration();
-            if(!_context.PrintToScreen())
+            if (!_context.PrintToScreen())
             {
                 return;
             }
@@ -147,7 +173,7 @@ namespace Bit.Setup
             Console.WriteLine("===================================================");
             Console.WriteLine("\nvisit {0}", _context.Config.Url);
             Console.Write("to update, run ");
-            if(_context.HostOS == "win")
+            if (_context.HostOS == "win")
             {
                 Console.Write("`.\\bitwarden.ps1 -updateself` and then `.\\bitwarden.ps1 -update`");
             }
@@ -167,7 +193,7 @@ namespace Bit.Setup
                     "globalSettings__sqlServer__connectionString");
                 var migrator = new DbMigrator(vaultConnectionString, null);
                 var success = migrator.MigrateMsSqlDatabase(false);
-                if(success)
+                if (success)
                 {
                     Helpers.WriteLine(_context, "Migration successful.");
                 }
@@ -176,9 +202,9 @@ namespace Bit.Setup
                     Helpers.WriteLine(_context, "Migration failed.");
                 }
             }
-            catch(SqlException e)
+            catch (SqlException e)
             {
-                if(e.Message.Contains("Server is in script upgrade mode") && attempt < 10)
+                if (e.Message.Contains("Server is in script upgrade mode") && attempt < 10)
                 {
                     var nextAttempt = attempt + 1;
                     Helpers.WriteLine(_context, "Database is in script upgrade mode. " +
@@ -193,24 +219,44 @@ namespace Bit.Setup
 
         private static bool ValidateInstallation()
         {
-            var installationId = Helpers.ReadInput("Enter your installation id (get at https://bitwarden.com/host)");
-            if(!Guid.TryParse(installationId.Trim(), out var installationidGuid))
+            var installationId = string.Empty;
+            var installationKey = string.Empty;
+
+            if (_context.Parameters.ContainsKey("install-id"))
+            {
+                installationId = _context.Parameters["install-id"].ToLowerInvariant();
+            }
+            else
+            {
+                installationId = Helpers.ReadInput("Enter your installation id (get at https://bitwarden.com/host)");
+            }
+
+            if (!Guid.TryParse(installationId.Trim(), out var installationidGuid))
             {
                 Console.WriteLine("Invalid installation id.");
                 return false;
             }
 
+            if (_context.Parameters.ContainsKey("install-key"))
+            {
+                installationKey = _context.Parameters["install-key"];
+            }
+            else
+            {
+                installationKey = Helpers.ReadInput("Enter your installation key");
+            }
+
             _context.Install.InstallationId = installationidGuid;
-            _context.Install.InstallationKey = Helpers.ReadInput("Enter your installation key");
+            _context.Install.InstallationKey = installationKey;
 
             try
             {
                 var response = new HttpClient().GetAsync("https://api.bitwarden.com/installations/" +
                     _context.Install.InstallationId).GetAwaiter().GetResult();
 
-                if(!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
-                    if(response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
                         Console.WriteLine("Invalid installation id.");
                     }
@@ -224,7 +270,7 @@ namespace Bit.Setup
 
                 var resultString = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var result = JsonConvert.DeserializeObject<dynamic>(resultString);
-                if(!(bool)result.Enabled)
+                if (!(bool)result.Enabled)
                 {
                     Console.WriteLine("Installation id has been disabled.");
                     return false;
@@ -262,9 +308,9 @@ namespace Bit.Setup
         private static void ParseParameters()
         {
             _context.Parameters = new Dictionary<string, string>();
-            for(var i = 0; i < _context.Args.Length; i = i + 2)
+            for (var i = 0; i < _context.Args.Length; i = i + 2)
             {
-                if(!_context.Args[i].StartsWith("-"))
+                if (!_context.Args[i].StartsWith("-"))
                 {
                     continue;
                 }

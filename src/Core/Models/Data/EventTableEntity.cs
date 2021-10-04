@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using Bit.Core.Enums;
 using Bit.Core.Utilities;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace Bit.Core.Models.Data
 {
@@ -17,10 +16,14 @@ namespace Bit.Core.Models.Data
             Type = e.Type;
             UserId = e.UserId;
             OrganizationId = e.OrganizationId;
+            ProviderId = e.ProviderId;
             CipherId = e.CipherId;
             CollectionId = e.CollectionId;
+            PolicyId = e.PolicyId;
             GroupId = e.GroupId;
             OrganizationUserId = e.OrganizationUserId;
+            ProviderUserId = e.ProviderUserId;
+            ProviderOrganizationId = e.ProviderOrganizationId;
             DeviceType = e.DeviceType;
             IpAddress = e.IpAddress;
             ActingUserId = e.ActingUserId;
@@ -30,10 +33,14 @@ namespace Bit.Core.Models.Data
         public EventType Type { get; set; }
         public Guid? UserId { get; set; }
         public Guid? OrganizationId { get; set; }
+        public Guid? ProviderId { get; set; }
         public Guid? CipherId { get; set; }
         public Guid? CollectionId { get; set; }
+        public Guid? PolicyId { get; set; }
         public Guid? GroupId { get; set; }
         public Guid? OrganizationUserId { get; set; }
+        public Guid? ProviderUserId { get; set; }
+        public Guid? ProviderOrganizationId { get; set; }
         public DeviceType? DeviceType { get; set; }
         public string IpAddress { get; set; }
         public Guid? ActingUserId { get; set; }
@@ -43,7 +50,7 @@ namespace Bit.Core.Models.Data
             var result = base.WriteEntity(operationContext);
 
             var typeName = nameof(Type);
-            if(result.ContainsKey(typeName))
+            if (result.ContainsKey(typeName))
             {
                 result[typeName] = new EntityProperty((int)Type);
             }
@@ -53,7 +60,7 @@ namespace Bit.Core.Models.Data
             }
 
             var deviceTypeName = nameof(DeviceType);
-            if(result.ContainsKey(deviceTypeName))
+            if (result.ContainsKey(deviceTypeName))
             {
                 result[deviceTypeName] = new EntityProperty((int?)DeviceType);
             }
@@ -71,13 +78,13 @@ namespace Bit.Core.Models.Data
             base.ReadEntity(properties, operationContext);
 
             var typeName = nameof(Type);
-            if(properties.ContainsKey(typeName) && properties[typeName].Int32Value.HasValue)
+            if (properties.ContainsKey(typeName) && properties[typeName].Int32Value.HasValue)
             {
                 Type = (EventType)properties[typeName].Int32Value.Value;
             }
 
             var deviceTypeName = nameof(DeviceType);
-            if(properties.ContainsKey(deviceTypeName) && properties[deviceTypeName].Int32Value.HasValue)
+            if (properties.ContainsKey(deviceTypeName) && properties[deviceTypeName].Int32Value.HasValue)
             {
                 DeviceType = (DeviceType)properties[deviceTypeName].Int32Value.Value;
             }
@@ -86,7 +93,9 @@ namespace Bit.Core.Models.Data
         public static List<EventTableEntity> IndexEvent(EventMessage e)
         {
             var uniquifier = e.IdempotencyId.GetValueOrDefault(Guid.NewGuid());
-            var pKey = e.OrganizationId.HasValue ? $"OrganizationId={e.OrganizationId}" : $"UserId={e.UserId}";
+
+            var pKey = GetPartitionKey(e);
+
             var dateKey = CoreHelpers.DateTimeToTableStorageKey(e.Date);
 
             var entities = new List<EventTableEntity>
@@ -94,31 +103,53 @@ namespace Bit.Core.Models.Data
                 new EventTableEntity(e)
                 {
                     PartitionKey = pKey,
-                    RowKey = string.Format("Date={0}__Uniquifier={1}", dateKey, uniquifier)
+                    RowKey = $"Date={dateKey}__Uniquifier={uniquifier}"
                 }
             };
 
-            if(e.OrganizationId.HasValue && e.ActingUserId.HasValue)
+            if (e.OrganizationId.HasValue && e.ActingUserId.HasValue)
             {
                 entities.Add(new EventTableEntity(e)
                 {
                     PartitionKey = pKey,
-                    RowKey = string.Format("ActingUserId={0}__Date={1}__Uniquifier={2}",
-                        e.ActingUserId, dateKey, uniquifier)
+                    RowKey = $"ActingUserId={e.ActingUserId}__Date={dateKey}__Uniquifier={uniquifier}"
                 });
             }
 
-            if(e.CipherId.HasValue)
+            if (!e.OrganizationId.HasValue && e.ProviderId.HasValue && e.ActingUserId.HasValue)
             {
                 entities.Add(new EventTableEntity(e)
                 {
                     PartitionKey = pKey,
-                    RowKey = string.Format("CipherId={0}__Date={1}__Uniquifier={2}",
-                        e.CipherId, dateKey, uniquifier)
+                    RowKey = $"ActingUserId={e.ActingUserId}__Date={dateKey}__Uniquifier={uniquifier}"
+                });
+            }
+
+            if (e.CipherId.HasValue)
+            {
+                entities.Add(new EventTableEntity(e)
+                {
+                    PartitionKey = pKey,
+                    RowKey = $"CipherId={e.CipherId}__Date={dateKey}__Uniquifier={uniquifier}"
                 });
             }
 
             return entities;
+        }
+
+        private static string GetPartitionKey(EventMessage e)
+        {
+            if (e.OrganizationId.HasValue)
+            {
+                return $"OrganizationId={e.OrganizationId}";
+            }
+            
+            if (e.ProviderId.HasValue)
+            {
+                return $"ProviderId={e.ProviderId}";
+            }
+
+            return $"UserId={e.UserId}";
         }
     }
 }

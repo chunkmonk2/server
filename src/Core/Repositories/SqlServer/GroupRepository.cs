@@ -9,6 +9,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Bit.Core.Utilities;
 using Bit.Core.Models.Data;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Repositories.SqlServer
 {
@@ -24,7 +25,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<Tuple<Group, ICollection<SelectionReadOnly>>> GetByIdWithCollectionsAsync(Guid id)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryMultipleAsync(
                     $"[{Schema}].[Group_ReadWithCollectionsById]",
@@ -40,7 +41,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Group>> GetManyByOrganizationIdAsync(Guid organizationId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Group>(
                     $"[{Schema}].[Group_ReadByOrganizationId]",
@@ -53,7 +54,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Guid>> GetManyIdsByUserIdAsync(Guid organizationUserId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Guid>(
                     $"[{Schema}].[GroupUser_ReadGroupIdsByOrganizationUserId]",
@@ -66,7 +67,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<Guid>> GetManyUserIdsByIdAsync(Guid id)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<Guid>(
                     $"[{Schema}].[GroupUser_ReadOrganizationUserIdsByGroupId]",
@@ -79,7 +80,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task<ICollection<GroupUser>> GetManyGroupUsersByOrganizationIdAsync(Guid organizationId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.QueryAsync<GroupUser>(
                     $"[{Schema}].[GroupUser_ReadByOrganizationId]",
@@ -96,7 +97,7 @@ namespace Bit.Core.Repositories.SqlServer
             var objWithCollections = JsonConvert.DeserializeObject<GroupWithCollections>(JsonConvert.SerializeObject(obj));
             objWithCollections.Collections = collections.ToArrayTVP();
 
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.ExecuteAsync(
                     $"[{Schema}].[Group_CreateWithCollections]",
@@ -110,7 +111,7 @@ namespace Bit.Core.Repositories.SqlServer
             var objWithCollections = JsonConvert.DeserializeObject<GroupWithCollections>(JsonConvert.SerializeObject(obj));
             objWithCollections.Collections = collections.ToArrayTVP();
 
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.ExecuteAsync(
                     $"[{Schema}].[Group_UpdateWithCollections]",
@@ -121,7 +122,7 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task DeleteUserAsync(Guid groupId, Guid organizationUserId)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.ExecuteAsync(
                     $"[{Schema}].[GroupUser_Delete]",
@@ -132,18 +133,13 @@ namespace Bit.Core.Repositories.SqlServer
 
         public async Task UpdateUsersAsync(Guid groupId, IEnumerable<Guid> organizationUserIds)
         {
-            using(var connection = new SqlConnection(ConnectionString))
+            using (var connection = new SqlConnection(ConnectionString))
             {
                 var results = await connection.ExecuteAsync(
                     "[dbo].[GroupUser_UpdateUsers]",
                     new { GroupId = groupId, OrganizationUserIds = organizationUserIds.ToGuidIdArrayTVP() },
                     commandType: CommandType.StoredProcedure);
             }
-        }
-
-        public class GroupWithCollections : Group
-        {
-            public DataTable Collections { get; set; }
         }
     }
 }

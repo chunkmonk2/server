@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Bit.Core.Context;
 using Bit.Core.Models.Table;
 using Bit.Core.Enums;
 using Microsoft.AspNetCore.Http;
@@ -9,6 +10,7 @@ using Bit.Core.Models.Api;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using Bit.Core.Repositories;
+using Bit.Core.Settings;
 
 namespace Bit.Core.Services
 {
@@ -53,7 +55,7 @@ namespace Bit.Core.Services
 
         private async Task PushCipherAsync(Cipher cipher, PushType type, IEnumerable<Guid> collectionIds)
         {
-            if(cipher.OrganizationId.HasValue)
+            if (cipher.OrganizationId.HasValue)
             {
                 // We cannot send org pushes since access logic is much more complicated than just the fact that they belong
                 // to the organization. Potentially we could blindly send to just users that have the access all permission
@@ -62,7 +64,7 @@ namespace Bit.Core.Services
 
                 // await SendPayloadToOrganizationAsync(cipher.OrganizationId.Value, type, message, true);
             }
-            else if(cipher.UserId.HasValue)
+            else if (cipher.UserId.HasValue)
             {
                 var message = new SyncCipherPushNotification
                 {
@@ -139,6 +141,36 @@ namespace Bit.Core.Services
             await SendPayloadToUserAsync(userId, type, message, false);
         }
 
+        public async Task PushSyncSendCreateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendCreate);
+        }
+
+        public async Task PushSyncSendUpdateAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendUpdate);
+        }
+
+        public async Task PushSyncSendDeleteAsync(Send send)
+        {
+            await PushSendAsync(send, PushType.SyncSendDelete);
+        }
+
+        private async Task PushSendAsync(Send send, PushType type)
+        {
+            if (send.UserId.HasValue)
+            {
+                var message = new SyncSendPushNotification
+                {
+                    Id = send.Id,
+                    UserId = send.UserId.Value,
+                    RevisionDate = send.RevisionDate
+                };
+
+                await SendPayloadToUserAsync(message.UserId, type, message, true);
+            }
+        }
+
         private async Task SendPayloadToUserAsync(Guid userId, PushType type, object payload, bool excludeCurrentContext)
         {
             var request = new PushSendRequestModel
@@ -168,15 +200,15 @@ namespace Bit.Core.Services
         private async Task AddCurrentContextAsync(PushSendRequestModel request, bool addIdentifier)
         {
             var currentContext = _httpContextAccessor?.HttpContext?.
-                RequestServices.GetService(typeof(CurrentContext)) as CurrentContext;
-            if(!string.IsNullOrWhiteSpace(currentContext?.DeviceIdentifier))
+                RequestServices.GetService(typeof(ICurrentContext)) as ICurrentContext;
+            if (!string.IsNullOrWhiteSpace(currentContext?.DeviceIdentifier))
             {
                 var device = await _deviceRepository.GetByIdentifierAsync(currentContext.DeviceIdentifier);
-                if(device != null)
+                if (device != null)
                 {
                     request.DeviceId = device.Id.ToString();
                 }
-                if(addIdentifier)
+                if (addIdentifier)
                 {
                     request.Identifier = currentContext.DeviceIdentifier;
                 }

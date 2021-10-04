@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Bit.Core.Models.Mail;
+using Bit.Core.Settings;
+using Bit.Core.Utilities;
 using System.Linq;
 using Amazon.SimpleEmail;
 using Amazon;
@@ -14,39 +16,54 @@ namespace Bit.Core.Services
     public class AmazonSesMailDeliveryService : IMailDeliveryService, IDisposable
     {
         private readonly GlobalSettings _globalSettings;
-        private readonly IHostingEnvironment _hostingEnvironment;
+        private readonly IWebHostEnvironment _hostingEnvironment;
         private readonly ILogger<AmazonSesMailDeliveryService> _logger;
-        private readonly AmazonSimpleEmailServiceClient _client;
+        private readonly IAmazonSimpleEmailService _client;
         private readonly string _source;
         private readonly string _senderTag;
         private readonly string _configSetName;
 
         public AmazonSesMailDeliveryService(
             GlobalSettings globalSettings,
-            IHostingEnvironment hostingEnvironment,
+            IWebHostEnvironment hostingEnvironment,
             ILogger<AmazonSesMailDeliveryService> logger)
+        : this(globalSettings, hostingEnvironment, logger,
+              new AmazonSimpleEmailServiceClient(
+                globalSettings.Amazon.AccessKeyId,
+                globalSettings.Amazon.AccessKeySecret,
+                RegionEndpoint.GetBySystemName(globalSettings.Amazon.Region))
+              )
         {
-            if(string.IsNullOrWhiteSpace(globalSettings.Amazon?.AccessKeyId))
+        }
+
+        public AmazonSesMailDeliveryService(
+            GlobalSettings globalSettings,
+            IWebHostEnvironment hostingEnvironment,
+            ILogger<AmazonSesMailDeliveryService> logger,
+            IAmazonSimpleEmailService amazonSimpleEmailService)
+        {
+            if (string.IsNullOrWhiteSpace(globalSettings.Amazon?.AccessKeyId))
             {
                 throw new ArgumentNullException(nameof(globalSettings.Amazon.AccessKeyId));
             }
-            if(string.IsNullOrWhiteSpace(globalSettings.Amazon?.AccessKeySecret))
+            if (string.IsNullOrWhiteSpace(globalSettings.Amazon?.AccessKeySecret))
             {
                 throw new ArgumentNullException(nameof(globalSettings.Amazon.AccessKeySecret));
             }
-            if(string.IsNullOrWhiteSpace(globalSettings.Amazon?.Region))
+            if (string.IsNullOrWhiteSpace(globalSettings.Amazon?.Region))
             {
                 throw new ArgumentNullException(nameof(globalSettings.Amazon.Region));
             }
 
+            var replyToEmail = CoreHelpers.PunyEncode(globalSettings.Mail.ReplyToEmail);
+
             _globalSettings = globalSettings;
             _hostingEnvironment = hostingEnvironment;
             _logger = logger;
-            _client = new AmazonSimpleEmailServiceClient(globalSettings.Amazon.AccessKeyId,
-                globalSettings.Amazon.AccessKeySecret, RegionEndpoint.GetBySystemName(globalSettings.Amazon.Region));
-            _source = $"\"{globalSettings.SiteName}\" <{globalSettings.Mail.ReplyToEmail}>";
-            _senderTag = $"Server_{globalSettings.ProjectName}";
-            if(!string.IsNullOrWhiteSpace(_globalSettings.Mail.AmazonConfigSetName))
+            _client = amazonSimpleEmailService;
+            _source = $"\"{globalSettings.SiteName}\" <{replyToEmail}>";
+            _senderTag = $"Server_{globalSettings.ProjectName?.Replace(' ', '_')}";
+            if (!string.IsNullOrWhiteSpace(_globalSettings.Mail.AmazonConfigSetName))
             {
                 _configSetName = _globalSettings.Mail.AmazonConfigSetName;
             }
@@ -65,7 +82,9 @@ namespace Bit.Core.Services
                 Source = _source,
                 Destination = new Destination
                 {
-                    ToAddresses = message.ToEmails.ToList()
+                    ToAddresses = message.ToEmails
+                        .Select(email => CoreHelpers.PunyEncode(email))
+                        .ToList()
                 },
                 Message = new Message
                 {
@@ -91,12 +110,14 @@ namespace Bit.Core.Services
                 }
             };
 
-            if(message.BccEmails?.Any() ?? false)
+            if (message.BccEmails?.Any() ?? false)
             {
-                request.Destination.BccAddresses = message.BccEmails.ToList();
+                request.Destination.BccAddresses = message.BccEmails
+                    .Select(email => CoreHelpers.PunyEncode(email))
+                    .ToList();
             }
 
-            if(!string.IsNullOrWhiteSpace(message.Category))
+            if (!string.IsNullOrWhiteSpace(message.Category))
             {
                 request.Tags.Add(new MessageTag { Name = "Category", Value = message.Category });
             }
@@ -105,9 +126,9 @@ namespace Bit.Core.Services
             {
                 await SendAsync(request, false);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                _logger.LogWarning(e, "Failed to send email. Re-retying...");
+                _logger.LogWarning(e, "Failed to send email. Retrying...");
                 await SendAsync(request, true);
                 throw e;
             }
@@ -115,7 +136,7 @@ namespace Bit.Core.Services
 
         private async Task SendAsync(SendEmailRequest request, bool retry)
         {
-            if(retry)
+            if (retry)
             {
                 // wait and try again
                 await Task.Delay(2000);

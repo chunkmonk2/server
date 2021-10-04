@@ -2,6 +2,7 @@
 using Bit.Core.Services;
 using Microsoft.AspNetCore.Authorization;
 using Bit.Core;
+using Bit.Core.Context;
 using Bit.Core.Exceptions;
 using Bit.Core.Models.Api;
 using System.Threading.Tasks;
@@ -9,6 +10,8 @@ using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Bit.Api.Utilities;
 using Bit.Core.Utilities;
+using Bit.Core.Settings;
+using Microsoft.Extensions.Hosting;
 
 namespace Bit.Api.Controllers
 {
@@ -19,15 +22,15 @@ namespace Bit.Api.Controllers
     {
         private readonly IPushRegistrationService _pushRegistrationService;
         private readonly IPushNotificationService _pushNotificationService;
-        private readonly IHostingEnvironment _environment;
-        private readonly CurrentContext _currentContext;
+        private readonly IWebHostEnvironment _environment;
+        private readonly ICurrentContext _currentContext;
         private readonly GlobalSettings _globalSettings;
 
         public PushController(
             IPushRegistrationService pushRegistrationService,
             IPushNotificationService pushNotificationService,
-            IHostingEnvironment environment,
-            CurrentContext currentContext,
+            IWebHostEnvironment environment,
+            ICurrentContext currentContext,
             GlobalSettings globalSettings)
         {
             _currentContext = currentContext;
@@ -73,12 +76,12 @@ namespace Bit.Api.Controllers
         {
             CheckUsage();
 
-            if(!string.IsNullOrWhiteSpace(model.UserId))
+            if (!string.IsNullOrWhiteSpace(model.UserId))
             {
                 await _pushNotificationService.SendPayloadToUserAsync(Prefix(model.UserId),
                        model.Type.Value, model.Payload, Prefix(model.Identifier), Prefix(model.DeviceId));
             }
-            else if(!string.IsNullOrWhiteSpace(model.OrganizationId))
+            else if (!string.IsNullOrWhiteSpace(model.OrganizationId))
             {
                 await _pushNotificationService.SendPayloadToOrganizationAsync(Prefix(model.OrganizationId),
                     model.Type.Value, model.Payload, Prefix(model.Identifier), Prefix(model.DeviceId));
@@ -87,7 +90,7 @@ namespace Bit.Api.Controllers
 
         private string Prefix(string value)
         {
-            if(string.IsNullOrWhiteSpace(value))
+            if (string.IsNullOrWhiteSpace(value))
             {
                 return null;
             }
@@ -97,7 +100,7 @@ namespace Bit.Api.Controllers
 
         private void CheckUsage()
         {
-            if(CanUse())
+            if (CanUse())
             {
                 return;
             }
@@ -107,7 +110,7 @@ namespace Bit.Api.Controllers
 
         private bool CanUse()
         {
-            if(_environment.IsDevelopment())
+            if (_environment.IsDevelopment())
             {
                 return true;
             }
