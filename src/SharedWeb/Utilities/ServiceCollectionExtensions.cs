@@ -234,7 +234,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPaymentHistoryService, PaymentHistoryService>();
         services.AddSingleton<IStripeSyncService, StripeSyncService>();
         services.AddSingleton<IMailService, HandlebarsMailService>();
-        services.AddSingleton<ILicensingService, LicensingService>();
+        services.AddSingleton<ILicensingService, NoopLicensingService>();
         services.AddSingleton<ILookupClient>(_ =>
         {
             var options = new LookupClientOptions { Timeout = TimeSpan.FromSeconds(15), UseTcpOnly = true };
