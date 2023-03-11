@@ -172,7 +172,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPaymentService, StripePaymentService>();
         services.AddSingleton<IStripeSyncService, StripeSyncService>();
         services.AddSingleton<IMailService, HandlebarsMailService>();
-        services.AddSingleton<ILicensingService, LicensingService>();
+        services.AddSingleton<ILicensingService, NoopLicensingService>();
         services.AddTokenizers();
 
         if (CoreHelpers.SettingHasValue(globalSettings.ServiceBus.ConnectionString) &&
