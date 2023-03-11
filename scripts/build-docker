@@ -22,10 +22,10 @@ docker_build() {
 
   echo "Building docker image: bitwarden/$project_name_lower:$docker_tag"
   echo "=============================="
-  docker build -t bitwarden/$project_name_lower:$docker_tag $project_dir
+  docker build -t chunkmonk2/$project_name_lower:$docker_tag $project_dir
 
   if [ "$docker_push" == "1" ]; then
-    docker push bitwarden/$project_name_lower:$docker_tag $project_dir
+    docker push chunkmonk2/$project_name_lower:$docker_tag $project_dir
   fi
 }
 
