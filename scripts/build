@@ -31,6 +31,7 @@ case "$PROJECT" in
   "identity" | "Identity") build Identity $PWD/src/Identity ;;
   "notifications" | "Notifications") build Notifications $PWD/src/Notifications ;;
   "server" | "Server") build Server $PWD/util/Server ;;
+  "setup" | "Setup") build Setup $PWD/util/Setup ;;
   "sso" | "Sso") build Sso $PWD/bitwarden_license/src/Sso ;;
   "")
     build Admin $PWD/src/Admin

@@ -25,7 +25,7 @@ docker_build() {
   docker build -t chunkmonk2/$project_name_lower:$docker_tag $project_dir
 
   if [ "$docker_push" == "1" ]; then
-    docker push chunkmonk2/$project_name_lower:$docker_tag $project_dir
+    docker push chunkmonk2/$project_name_lower:$docker_tag 
   fi
 }
 
@@ -69,7 +69,7 @@ case "$PROJECT" in
   "server" | "Server") docker_build Server $PWD/util/Server $TAG $PUSH ;;
   "setup" | "Setup") docker_build Setup $PWD/util/Setup $TAG $PUSH ;;
   "sso" | "Sso") docker_build Sso $PWD/bitwarden_license/src/Sso $TAG $PUSH ;;
-  "")
+  "all")
     docker_build Admin $PWD/src/Admin $TAG $PUSH
     docker_build Api $PWD/src/Api $TAG $PUSH
     docker_build Attachments $PWD/util/Attachments $TAG $PUSH
