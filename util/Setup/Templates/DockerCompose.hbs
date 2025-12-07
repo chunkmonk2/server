@@ -16,7 +16,7 @@
 services:
 {{#if EnableBuiltInMsSql}}
   mssql:
-    image: ghcr.io/bitwarden/mssql:{{{CoreVersion}}}
+    image: chunkmonk2/mssql:{{{CoreVersion}}}
     container_name: bitwarden-mssql
     restart: always
     stop_grace_period: 60s
@@ -45,7 +45,7 @@ services:
       - ../env/uid.env
 
   attachments:
-    image: ghcr.io/bitwarden/attachments:{{{CoreVersion}}}
+    image: chunkmonk2/attachments:{{{CoreVersion}}}
     container_name: bitwarden-attachments
     restart: always
     volumes:
@@ -55,7 +55,7 @@ services:
       - ../env/uid.env
 
   api:
-    image: ghcr.io/bitwarden/api:{{{CoreVersion}}}
+    image: chunkmonk2/api:{{{CoreVersion}}}
     container_name: bitwarden-api
     restart: always
     volumes:
@@ -71,7 +71,7 @@ services:
       - public
 
   identity:
-    image: ghcr.io/bitwarden/identity:{{{CoreVersion}}}
+    image: chunkmonk2/identity:{{{CoreVersion}}}
     container_name: bitwarden-identity
     restart: always
     volumes:
@@ -88,7 +88,7 @@ services:
       - public
 
   sso:
-    image: ghcr.io/bitwarden/sso:{{{CoreVersion}}}
+    image: chunkmonk2/sso:{{{CoreVersion}}}
     container_name: bitwarden-sso
     restart: always
     volumes:
@@ -105,7 +105,7 @@ services:
       - public
 
   admin:
-    image: ghcr.io/bitwarden/admin:{{{CoreVersion}}}
+    image: chunkmonk2/admin:{{{CoreVersion}}}
     container_name: bitwarden-admin
     restart: always
 {{#if EnableBuiltInMsSql}}
@@ -125,7 +125,7 @@ services:
       - public
 
   icons:
-    image: ghcr.io/bitwarden/icons:{{{CoreVersion}}}
+    image: chunkmonk2/icons:{{{CoreVersion}}}
     container_name: bitwarden-icons
     restart: always
     volumes:
@@ -139,7 +139,7 @@ services:
       - public
 
   notifications:
-    image: ghcr.io/bitwarden/notifications:{{{CoreVersion}}}
+    image: chunkmonk2/notifications:{{{CoreVersion}}}
     container_name: bitwarden-notifications
     restart: always
     volumes:
@@ -154,7 +154,7 @@ services:
       - public
 
   events:
-    image: ghcr.io/bitwarden/events:{{{CoreVersion}}}
+    image: chunkmonk2/events:{{{CoreVersion}}}
     container_name: bitwarden-events
     restart: always
     volumes:
@@ -169,7 +169,7 @@ services:
       - public
 
   nginx:
-    image: ghcr.io/bitwarden/nginx:{{{CoreVersion}}}
+    image: chunkmonk2/nginx:{{{CoreVersion}}}
     container_name: bitwarden-nginx
     restart: always
     depends_on:

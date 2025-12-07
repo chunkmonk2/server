@@ -251,7 +251,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMailService, HandlebarsMailService>();
         // Modern mailers
         services.AddMailer();
-        services.AddSingleton<ILicensingService, LicensingService>();
+        services.AddSingleton<ILicensingService, NoopLicensingService>();
         services.AddSingleton<ILookupClient>(_ =>
         {
             var options = new LookupClientOptions { Timeout = TimeSpan.FromSeconds(15), UseTcpOnly = true };
